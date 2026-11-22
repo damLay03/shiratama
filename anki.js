@@ -60,7 +60,11 @@ async function importApkg(file,onStep){
   else if(zip.file('collection.anki21'))bytes=await zip.file('collection.anki21').async('uint8array');
   else if(zip.file('collection.anki2'))bytes=await zip.file('collection.anki2').async('uint8array');
   else throw new Error('Không thấy dữ liệu Anki trong file');
-  const d=new SQL.Database(bytes);
+  let d=new SQL.Database(bytes);
+  // Anki 2.1.50+ dùng collation 'unicase' mà sql.js không có: gỡ khỏi schema rồi mở lại
+  try{const u=d.exec("select count(*) from sqlite_master where sql like '%unicase%'");if(u.length&&u[0].values[0][0]>0){
+    d.exec("PRAGMA writable_schema=ON;DELETE FROM sqlite_master WHERE type='index' AND sql LIKE '%unicase%';UPDATE sqlite_master SET sql=replace(sql,'COLLATE unicase','') WHERE sql LIKE '%unicase%';PRAGMA writable_schema=OFF;");
+    const b2=d.export();d.close();d=new SQL.Database(b2)}}catch(e){console.warn('unicase',e)}
   const q=(sql)=>{const r=d.exec(sql);if(!r.length)return[];const {columns,values}=r[0];return values.map(v=>Object.fromEntries(columns.map((c,i)=>[c,v[i]])))};
   const has=(t)=>q(`select name from sqlite_master where type='table' and name='${t}'`).length>0;
   const col=q('select * from col')[0];
@@ -79,17 +83,21 @@ async function importApkg(file,onStep){
   if(has('decks'))q('select id,name from decks').forEach(x=>decks[x.id]=x.name.replace(/\x1f/g,'::'));
   else if(col.decks)Object.values(JSON.parse(col.decks)).forEach(x=>decks[x.id]=x.name);
   // ---- notes
-  const notes={};q('select id,mid,flds,tags from notes').forEach(n=>notes[n.id]=n);
+  const notes={};q('select id,guid,mid,flds,tags from notes').forEach(n=>notes[n.id]=n);
   // ---- revlog
   const rev={};q('select id,cid,ease,ivl,type from revlog order by id').forEach(r=>(rev[r.cid]=rev[r.cid]||[]).push(r));
   // ---- cards
   onStep('Đang chuyển lịch ôn…');
   const cards=q('select id,nid,did,ord,type,queue,due,ivl,factor,reps,lapses,data,odid,odue from cards');
-  const out=[];let fsrsN=0,replay=0;
+  const out=[];let fsrsN=0,replay=0,skipped=0,kept=0;
+  // thẻ đã ôn trong app (appAt) giữ lịch của app khi nhập lại deck đã cập nhật
+  const prev={};(await all('cards')).forEach(x=>prev[x.id]=x);
   const now=Date.now();const today=Math.floor((now/1000-crt)/86400);
   for(const c of cards){
     const n=notes[c.nid];if(!n)continue;const m=models[n.mid]||{flds:[],tmpls:[]};
-    const vals=n.flds.split('\x1f');const fields={};vals.forEach((v,i)=>fields[m.flds[i]||('F'+i)]=v);
+    const vals=n.flds.split('\x1f');
+    if((vals[0]||'').trim()==='dsdshdids'){skipped++;continue} // thẻ dư đã gộp khi chuẩn hóa
+    const fields={};vals.forEach((v,i)=>fields[m.flds[i]||('F'+i)]=v);
     const t=m.tmpls[c.ord]||m.tmpls[0];
     let front,back;
     if(t&&t.q){front=renderTpl(t.q,fields,'');back=renderTpl(t.a,fields,front)}else{front=vals[0];back=front+'<hr id=answer>'+vals.slice(1).join('<br>')}
@@ -104,7 +112,7 @@ async function importApkg(file,onStep){
         const F=FSRS.fsrs(FSRS.generatorParameters({enable_fuzz:false}));let k=FSRS.createEmptyCard(new Date(logs[0].id));
         for(const r of logs){try{k=F.repeat(k,new Date(r.id))[r.ease].card}catch(e){}}
         card.stability=k.stability;card.difficulty=k.difficulty;replay++}
-      card.last_review=new Date(logs[logs.length-1].id);
+      card.last_review=new Date(data.lrt?data.lrt*1000:logs[logs.length-1].id);
     }
     if(c.type===2||c.type===3||c.type===1){
       card.state=c.type===2?2:c.type===3?3:1;
@@ -115,7 +123,9 @@ async function importApkg(file,onStep){
       card.elapsed_days=Math.max(0,Math.round((now-card.last_review.getTime())/864e5));
       if(!card.stability){card.stability=Math.max(0.5,c.ivl||1);card.difficulty=Math.min(10,Math.max(1,11-(c.factor||2500)/250))}
     }
-    out.push({id:'a'+c.id,deck:String(did),front:clean(front),back:clean(back),card,susp:c.queue<0?1:0,nid:c.nid});
+    const old=prev['a'+c.id];
+    if(old&&old.appAt&&old.appAt>(data.lrt?data.lrt*1000:0)){card=old.card;kept++}
+    out.push({id:'a'+c.id,appAt:old&&old.appAt||0,deck:String(did),front:clean(front),back:clean(back),card,susp:c.queue<0?1:0,nid:c.nid,guid:n.guid,fl:vals,tags:(n.tags||'').trim()});
   }
   // ---- media (ảnh) — lưu vào máy để hiện trong thẻ
   onStep('Đang lưu ảnh…');
@@ -127,7 +137,10 @@ async function importApkg(file,onStep){
   const deckRows=[...new Set(out.map(c=>c.deck))].map(id=>({id,name:decks[id]||'Deck '+id,src:file.name,at:Date.now()}));
   await putMany('decks',deckRows);await putMany('cards',out);if(media.length)await putMany('media',media);
   d.close();
-  return {cards:out.length,decks:deckRows.length,fsrsN,replay,media:media.length};
+  // bỏ thẻ dư còn sót trong app từ lần nhập trước
+  const ids=new Set(out.map(o=>o.id)),cids=new Set(cards.map(c=>'a'+c.id));const stale=Object.values(prev).filter(x=>!ids.has(x.id)&&cids.has(x.id));
+  if(stale.length)await tx('cards','readwrite',s=>{stale.forEach(x=>s.delete(x.id))});
+  return {cards:out.length,decks:deckRows.length,fsrsN,replay,media:media.length,skipped,kept};
 }
 
 /* ---------- media trong thẻ ---------- */

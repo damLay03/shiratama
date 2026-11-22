@@ -319,7 +319,7 @@ async function ankiBox(){
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Xóa deck này khỏi app? File Anki gốc của anh không bị ảnh hưởng.'))return;await ANKI.delDeck(b.dataset.del);ankiBox()});
   $('#npd').onchange=e=>{S.newPerDay=Math.max(0,+e.target.value|0);save();ankiBox()};
   $('#ankiImp').onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='.apkg,.colpkg';i.onchange=async()=>{const msg=$('#impMsg');
-    try{const r=await ANKI.importApkg(i.files[0],t=>msg.textContent=t);msg.textContent=`Đã nhập ${r.cards} thẻ từ ${r.decks} deck. ${r.fsrsN} thẻ giữ nguyên độ nhớ FSRS từ Anki, ${r.replay} thẻ dựng lại từ lịch sử ôn${r.media?`, ${r.media} ảnh`:''}.`;setTimeout(ankiBox,2500)}
+    try{const r=await ANKI.importApkg(i.files[0],t=>msg.textContent=t);msg.textContent=`Đã nhập ${r.cards} thẻ từ ${r.decks} deck. ${r.fsrsN} thẻ giữ nguyên độ nhớ FSRS từ Anki, ${r.replay} thẻ dựng lại từ lịch sử ôn${r.media?`, ${r.media} ảnh`:''}.${r.skipped?` Bỏ qua ${r.skipped} thẻ dư (dsdshdids).`:''}${r.kept?` ${r.kept} thẻ giữ lịch đã ôn trong app.`:''}`;setTimeout(ankiBox,2500)}
     catch(e){msg.textContent='Không nhập được: '+e.message}};i.click()};
 }
 let AK=null;
@@ -344,7 +344,7 @@ function renderAnki(){
   $('#akq').onclick=()=>{AK=null;TAB='review';render()};
   const sh=$('#akshow');if(sh)sh.onclick=()=>{AK.show=true;renderAnki()};
   document.querySelectorAll('[data-r]').forEach(b=>b.onclick=async()=>{
-    const r=+b.dataset.r;const wasNew=it.card.state===0;it.card=rec[r].card;await ANKI.put('cards',it);
+    const r=+b.dataset.r;const wasNew=it.card.state===0;it.card=rec[r].card;it.appAt=Date.now();await ANKI.put('cards',it);
     const day=nl();if(wasNew)day.n++;day.r++;save();AK.done++;
     // thẻ quên hoặc đang học mà đến hạn trong 20 phút thì quay lại cuối hàng
     if(new Date(it.card.due)-Date.now()<20*60000)AK.list.push(it);

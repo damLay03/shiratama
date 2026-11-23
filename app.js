@@ -317,18 +317,24 @@ const GRAM=(()=>{let key=null,idx=null,loading=null;
   return {load,blob};
 })();
 const GLV=['N5','N4','N3','N2','N1'];
+// tên mẫu: "一番 いちばん" -> 一番（いちばん）, "ちゃいけない じゃだめ" -> ちゃいけない / じゃだめ; dòng dưới là romaji
+function gFront(x){const t=[...new Set(String(x.jp).replace(/\s+[A-Za-z][A-Za-z ]*$/,'').trim().split(/\s+/))];
+  const kana=w=>/^[\u3040-\u30ff～〜ー]+$/.test(w),kan=w=>/[\u4e00-\u9fff]/.test(w);
+  const jp=t.length===2&&kan(t[0])&&kana(t[1])?`${t[0]}（${t[1]}）`:t.join(' / ');
+  return `${esc(jp)}<div class="ro">${esc(String(x.ro).replace(/\s*particle$/,''))}</div>`}
 async function seedGram(){
-  if(ls.get('shiratama-gramseed',0)>=1||!window.ANKI)return;
-  try{const g=await GRAM.load();const decks=await ANKI.all('decks');const have=new Set((await ANKI.all('cards')).map(c=>c.id));
+  if(ls.get('shiratama-gramseed',0)>=2||!window.ANKI)return;
+  try{const g=await GRAM.load();const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
     const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
     if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
     const cards=[];const t0=Date.UTC(2026,10,23);
     GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}
-      g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;if(have.has(id))return;const tag=x.s?'s':'r';
-        const front=esc(x.jp),back=`<img src="gram:${lv}/${n}${tag}">`;
+      g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;const tag=x.s?'s':'r';
+        const front=gFront(x),back=`<img src="gram:${lv}/${n}${tag}">`;
+        if(have.has(id)){const c=old[id];if(!c.edited&&c.front!==front){c.front=front;c.fl=[front,back];c.back=front+'<hr id=answer>'+back;fix.push(c)}return}
         cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>'+back,tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
-    if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);
-    ls.set('shiratama-gramseed',1);if(cards.length)dropState()}catch(e){console.warn('gram',e)}
+    if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);if(fix.length)await ANKI.putMany('cards',fix);
+    ls.set('shiratama-gramseed',2);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
 }
 // ảnh trong thẻ mà máy chưa có: ảnh ngữ pháp mã hóa, hoặc ảnh anh tự thêm ở máy khác
 window.ANKI_FB=async n=>{if(n.startsWith('gram:'))return GRAM.blob(n.slice(5));return SYNC.getMedia(n)};
@@ -345,9 +351,11 @@ async function imgToCard(file){
 const isStar=c=>(' '+(c.tags||'')+' ').includes(' '+STAR+' ');
 async function setStar(c,on){const t=new Set((c.tags||'').split(/\s+/).filter(Boolean));on?t.add(STAR):t.delete(STAR);c.tags=[...t].join(' ');try{await ANKI.put('cards',c)}catch(e){toast(L('Không lưu được','Could not save'))}}
 function startFlipDeck(st,set,name){
-  const all=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
+  const tree=deckTree(st);const secs=[];const walk=n=>{const x=tree.nodes[n];if(x.id&&set.has(x.id))secs.push({id:x.id,name:n===name?x.name.split('::').pop():n.slice(name.length+2)});x.kids.forEach(walk)};walk(name);
+  const rank={};secs.forEach((x,k)=>rank[x.id]=k);
+  const all=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>(rank[a.deck]-rank[b.deck])||createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
   if(!all.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
-  S.flipPos=S.flipPos||{};FV={key:'d:'+name,title:name.split('::').pop(),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
+  S.flipPos=S.flipPos||{};FV={key:'d:'+name,title:name.split('::').pop(),secs,col:new Set(ls.get('shiratama-fcol:'+name,null)||(secs.filter(x=>all.some(c=>c.deck===x.id)).length>1?secs.map(x=>x.id):[])),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
   flipItems();render()}
 function flipItems(){const F=FV;let it=F.all;if(F.only)it=it.filter(isStar);if(F.shuf)it=F.shufOrder?F.shufOrder.filter(c=>it.includes(c)):it;F.items=it;
   if(F.i>=it.length)F.i=Math.max(0,it.length-1)}
@@ -362,22 +370,31 @@ function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
 function bindFlipTop(){const F=FV;
   $('#fvonly').onclick=()=>{if(!F.only&&!F.all.some(isStar)){toast(L('Chưa có thẻ ★ nào','No starred cards yet'));return}F.only=!F.only;S.flipOnly=S.flipOnly||{};S.flipOnly[F.name]=F.only;save();F.i=0;flipItems();render()};
   $('#fvsh').onclick=()=>{F.shuf=!F.shuf;F.shufOrder=F.shuf?shuffle(F.all):null;F.i=0;flipItems();toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));render()}}
+function cardTitle(c){const f=String(c.front);const m=f.split(/<br\s*\/?>|<div/i);const t=stripHtml(m[0]).trim();const sub=stripHtml(f.slice(m[0].length)).trim();
+  return {t:t||(/<img/i.test(f)?L('(ảnh)','(image)'):''),sub,im:!t&&/<img/i.test(f)}}
 function renderFlipList(){
-  const F=FV,N=F.items.length,pos=Math.min(S.flipPos[F.key]||0,F.all.length-1),cont=F.all[pos];
-  full(`${flipTop(`<b>${N}</b><span class="tiny"> ${L('thẻ','cards')}</span>`)}
+  const F=FV,N=F.items.length,pos=Math.min(S.flipPos[F.key]||0,F.all.length-1);
+  const idx=new Map(F.items.map((c,k)=>[c,k]));
+  const groups=F.shuf?[{id:'*',name:L('Đã trộn thứ tự','Shuffled'),cards:F.items}]:F.secs.map(x=>({id:x.id,name:x.name,cards:F.items.filter(c=>c.deck===x.id)})).filter(g=>g.cards.length);
+  const multi=groups.length>1;
+  const row=c=>{const k=idx.get(c),T=cardTitle(c),st=isStar(c);
+    return `<div class="frow ${st?'st':''}" data-fi="${k}"><span class="fno">${k+1}</span>${T.im?`<div class="fth" data-th="${k}"></div>`:''}<div class="ftx"><div class="jp">${esc(T.t)}</div>${T.sub?`<small>${esc(T.sub)}</small>`:''}</div><button class="fstar ${st?'on':''}" data-fst="${k}" aria-label="★">★</button></div>`};
+  full(`${flipTop(`<b>${N}</b><span class="tiny"> ${L('thẻ','cards')}${multi?` · ${groups.length} ${L('mục','sections')}`:''}</span>`)}
    <div class="flist">
     <div class="row wrapbtn fl-act"><button class="btn bee grow" id="flgo">${F.only?L('Lướt các thẻ ★','Flip starred'):L('Lướt từ đầu','Start')}</button>${!F.only&&!F.shuf&&pos>0?`<button class="btn line grow" id="flcont">${L('Tiếp tục từ thẻ ','Continue at ')}${pos+1}</button>`:''}</div>
-    <div class="tiny" style="margin:2px 2px 10px">${L('Chạm thẻ để lướt từ thẻ đó. ★ là thẻ anh đánh dấu chưa thuộc.','Tap a card to start there. ★ marks cards you don\'t know yet.')}</div>
-    ${N?`<div class="ftiles">${F.items.map((c,k)=>{const t=stripHtml(c.front).trim();const im=!t&&/<img/i.test(c.front);
-      return `<button class="ftile ${isStar(c)?'st':''} ${im?'im':''}" data-fi="${k}"><span class="fn">${k+1}</span>${isStar(c)?'<span class="fs">★</span>':''}${im?`<div class="fth" data-th="${k}"></div>`:`<span class="ft jp">${esc(t.slice(0,40))}</span>`}</button>`}).join('')}</div>`
+    ${N?groups.map(g=>{const open=!multi||!F.col.has(g.id);const ns=g.cards.filter(isStar).length;
+      return `<section class="fsec">${multi?`<button class="fsh" data-sec="${esc(g.id)}"><span class="car">${open?'▾':'▸'}</span><b>${esc(g.name)}</b><span class="tiny">${g.cards.length} ${L('thẻ','cards')}${ns?` · ★ ${ns}`:''}</span><span class="grow"></span><span class="fgo" data-sgo="${idx.get(g.cards[0])}">${L('Lướt mục này','Flip this')} ›</span></button>`:''}
+       ${open?`<div class="frows">${g.cards.map(row).join('')}</div>`:''}</section>`}).join('')
       :`<div class="card center tiny">${L('Chưa có thẻ ★ nào.','No starred cards.')}</div>`}
    </div>`);
   bindFlipTop();
   $('#fvq').onclick=()=>{FV=null;TAB='home';render()};
   $('#flgo').onclick=()=>{F.i=0;F.view='card';F.show=false;render()};
-  if($('#flcont'))$('#flcont').onclick=()=>{F.i=pos;F.view='card';F.show=false;render()};
-  $$('[data-fi]').forEach(b=>b.onclick=()=>{F.i=+b.dataset.fi;F.view='card';F.show=false;render()});
-  // ảnh nhỏ: chỉ nạp khi cuộn tới
+  if($('#flcont'))$('#flcont').onclick=()=>{F.i=Math.max(0,F.items.indexOf(F.all[pos]));F.view='card';F.show=false;render()};
+  $$('[data-fi]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-fst]'))return;F.i=+b.dataset.fi;F.view='card';F.show=false;render()});
+  $$('[data-fst]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const c=F.items[+b.dataset.fst],on=!isStar(c);await setStar(c,on);b.classList.toggle('on',on);b.closest('.frow').classList.toggle('st',on);const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length});
+  $$('[data-sec]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-sgo]')){F.i=+e.target.closest('[data-sgo]').dataset.sgo;F.view='card';F.show=false;return render()}
+    const id=b.dataset.sec;F.col.has(id)?F.col.delete(id):F.col.add(id);ls.set('shiratama-fcol:'+F.name,[...F.col]);const y=$('.flist').scrollTop;renderFlipList();$('.flist').scrollTop=y});
   const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;io.unobserve(e.target);const c=F.items[+e.target.dataset.th];
     const m=String(c.front).match(/<img[^>]*>/i);if(m){e.target.innerHTML=m[0];ANKI.hydrate(e.target)}}),{rootMargin:'300px'});
   $$('[data-th]').forEach(x=>io.observe(x));
@@ -385,7 +402,8 @@ function renderFlipList(){
 function renderFlipCard(){
   const F=FV,N=F.items.length;if(!N){F.view='list';return renderFlipList()}
   const it=F.items[F.i],cfg=flipCfg(),two=hasBack(it);
-  full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}</span>`)}
+  const sec=F.secs.length>1?(F.secs.find(x=>x.id===it.deck)||{}).name:'';
+  full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}${sec?` · ${esc(sec)}`:''}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
    ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
    <div class="deckwrap flipwrap" id="akwrap"><div class="stage" id="stage"><div class="fc ${F.show?'flip':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>

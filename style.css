@@ -810,3 +810,9 @@ body.studying .cloud{animation-duration:var(--dur)}
 .exback{margin-bottom:12px}
 @media (max-width:520px){.exrow{grid-template-columns:70px minmax(0,1fr) 16px;padding:12px}.exd b{font-size:17px}.expt{font-size:11.5px;padding:2px 8px}}
 @media (min-width:1100px){.exlist{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* v51: thẻ một mặt (tên ẩn + ảnh) */
+.fc .gt{display:none}
+.fc .face:has(.gt){padding:12px}
+.fc .face .fin:has(.gt){margin:auto;width:100%;height:100%;display:flex;align-items:center;justify-content:center}
+.fc .face .gt+img{max-width:100%;max-height:100%;border-radius:14px;object-fit:contain}
+.preview .gt,.bedit .gt{font-weight:700}

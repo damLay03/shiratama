@@ -323,18 +323,19 @@ function gFront(x){const t=[...new Set(String(x.jp).replace(/\s+[A-Za-z][A-Za-z 
   const jp=t.length===2&&kan(t[0])&&kana(t[1])?`${t[0]}（${t[1]}）`:t.join(' / ');
   return `${esc(jp)}<div class="ro">${esc(String(x.ro).replace(/\s*particle$/,''))}</div>`}
 async function seedGram(){
-  if(ls.get('shiratama-gramseed',0)>=2||!window.ANKI)return;
+  if(ls.get('shiratama-gramseed',0)>=3||!window.ANKI)return;
   try{const g=await GRAM.load();const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
     const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
     if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
     const cards=[];const t0=Date.UTC(2026,10,23);
     GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}
       g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;const tag=x.s?'s':'r';
-        const front=gFront(x),back=`<img src="gram:${lv}/${n}${tag}">`;
-        if(have.has(id)){const c=old[id];if(!c.edited&&c.front!==front){c.front=front;c.fl=[front,back];c.back=front+'<hr id=answer>'+back;fix.push(c)}return}
-        cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>'+back,tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
+        // thẻ một mặt: tên (ẩn khi lướt, dùng để tìm) + ảnh; không có mặt sau
+        const front=`<div class="gt">${gFront(x)}</div><img src="gram:${lv}/${n}${tag}">`,back='';
+        if(have.has(id)){const c=old[id];if(!c.edited&&c.front!==front){c.front=front;c.fl=[front,back];c.back=front+'<hr id=answer>';fix.push(c)}return}
+        cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>',tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
     if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);if(fix.length)await ANKI.putMany('cards',fix);
-    ls.set('shiratama-gramseed',2);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
+    ls.set('shiratama-gramseed',3);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
 }
 // ảnh trong thẻ mà máy chưa có: ảnh ngữ pháp mã hóa, hoặc ảnh anh tự thêm ở máy khác
 window.ANKI_FB=async n=>{if(n.startsWith('gram:'))return GRAM.blob(n.slice(5));return SYNC.getMedia(n)};
@@ -370,7 +371,8 @@ function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
 function bindFlipTop(){const F=FV;
   $('#fvonly').onclick=()=>{if(!F.only&&!F.all.some(isStar)){toast(L('Chưa có thẻ ★ nào','No starred cards yet'));return}F.only=!F.only;S.flipOnly=S.flipOnly||{};S.flipOnly[F.name]=F.only;save();F.i=0;flipItems();render()};
   $('#fvsh').onclick=()=>{F.shuf=!F.shuf;F.shufOrder=F.shuf?shuffle(F.all):null;F.i=0;flipItems();toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));render()}}
-function cardTitle(c){const f=String(c.front);const m=f.split(/<br\s*\/?>|<div/i);const t=stripHtml(m[0]).trim();const sub=stripHtml(f.slice(m[0].length)).trim();
+function cardTitle(c){const f=String(c.front);const ro=(f.match(/<div class="ro">([\s\S]*?)<\/div>/)||[])[1];const g=f.replace(/<div class="ro">[\s\S]*?<\/div>/,'');
+  const m=g.split(/<br\s*\/?>|<img/i);const t=stripHtml(m[0]).trim();const sub=ro!=null?stripHtml(ro).trim():stripHtml(g.slice(m[0].length)).trim();
   return {t:t||(/<img/i.test(f)?L('(ảnh)','(image)'):''),sub,im:!t&&/<img/i.test(f)}}
 function renderFlipList(){
   const F=FV,N=F.items.length,pos=Math.min(S.flipPos[F.key]||0,F.all.length-1);

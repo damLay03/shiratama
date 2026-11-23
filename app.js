@@ -176,7 +176,7 @@ function mainTab(){return STUDY_SUB.includes(TAB)?'home':EXAM_SUB.includes(TAB)?
 function subnav(){if(!DATA)return '';
   const m=mainTab();const it=m==='home'?[['home',L('Tổng quan','Overview')],['browse',L('Duyệt thẻ','Browse')],['stats',L('Thống kê','Stats')]]:m==='exam'?[['exam',L('Bộ đề','Tests')],['examstats',L('Thống kê','Stats')]]:null;
   return it?`<div class="subnav">${it.map(([k,l])=>`<button data-sub="${k}" class="${TAB===k?'on':''}">${l}</button>`).join('')}</div>`:''}
-function header(){return `<div class="top"><div class="brand">${dog('mini')}<div>${APP}<small>${greet()}</small></div></div></div>${subnav()}`}
+function header(){return `<div class="top"><div class="brand">${dog('mini')}<div>${APP}<small>${greet()}</small></div></div>${DATA?SYNC.chip():''}</div>${subnav()}`}
 
 function sys(){
   const draw=()=>{shell(`${header()}<div class="h">${L('Hệ thống','System')}</div><div class="sysgrid">
@@ -202,7 +202,9 @@ function sys(){
     <div class="tiny" style="margin-top:8px">${L('Khi đang học có nút A− / A+ ở thanh trên.','While studying use A− / A+ in the top bar.')}</div></div>
    <div class="card"><div class="ot">${L('Dữ liệu','Data')}</div>
     <div class="kv"><span>${L('Bộ thẻ Anki cập nhật','Anki collection updated')}</span><b>${ls.get('shiratama-colv')?new Date(ls.get('shiratama-colv')*1000).toLocaleDateString(L('vi-VN','en-GB')):'—'}</b></div>
-    <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này. Chưa đồng bộ giữa các máy.','Progress is stored on this device. No sync between devices yet.')}</div>
+    <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này, đồng thời được gửi lên kho chung. Điện thoại và máy tính nhập cùng mã sẽ thấy cùng tiến độ.','Progress is saved here and synced. Devices with the same code share progress.')}</div>
+    <div class="ot" style="margin-top:4px">${L('Đồng bộ','Sync')}</div>${SYNC.detail()}
+    <div class="row wrapbtn" style="margin:10px 0 12px"><button class="btn line" id="ssync">${L('Đồng bộ ngay','Sync now')}</button></div>
     <button class="btn line" id="slock">${L('Khóa app trên máy này','Lock app on this device')}</button></div>
   </div>`);
     $$('[data-l]').forEach(b=>b.onclick=()=>{S.lang=b.dataset.l;save();applyLook();draw()});
@@ -210,6 +212,7 @@ function sys(){
     $$('[data-sf]').forEach(b=>b.onclick=()=>{SFX.set(b.dataset.sf==='1');draw()});
     $('#sfv').oninput=e=>{S.sfxv=+e.target.value/100;save()};$('#sfv').onchange=()=>SFX.play('ok');
     $$('[data-try]').forEach(b=>b.onclick=()=>SFX.play(b.dataset.try));
+    $('#ssync').onclick=()=>SYNC.run();
     $$('[data-tl]').forEach(b=>b.onclick=async()=>{if(b.dataset.tl==='1'){const ok=await SKYFX.askTilt();if(!ok)toast(L('iPhone chưa cho phép cảm biến chuyển động','Motion access was not allowed'))}else{S.tilt=0;save();document.documentElement.style.setProperty('--px',0);document.documentElement.style.setProperty('--py',0)}draw()});
     $('#smv').oninput=e=>{S.vol=+e.target.value/100;save();MUSIC.vol()};
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
@@ -236,7 +239,7 @@ function lockScreen(err){
   ${err?`<p class="small" style="color:var(--ng)">${esc(err)}</p>`:''}
   <button class="btn bee" id="open" style="width:100%;margin-top:14px">${L('Mở','Open')}</button></div>`,{tabs:false});
   const go=async()=>{const c=$('#code').value;if(!c)return;$('#open').disabled=true;$('#open').textContent=L('Đang mở…','Opening…');
-    try{DATA=await loadContent(c);ls.set('shiratama-code',c);indexData();await openBundle(c);render()}catch(e){lockScreen(L('Mã không đúng, hoặc chưa tải được đề.','Wrong code, or the tests could not be loaded.'))}};
+    try{DATA=await loadContent(c);ls.set('shiratama-code',c);indexData();await openBundle(c);render();SYNC.start(c)}catch(e){lockScreen(L('Mã không đúng, hoặc chưa tải được đề.','Wrong code, or the tests could not be loaded.'))}};
   $('#open').onclick=go;$('#code').onkeydown=e=>{if(e.key==='Enter')go()};
 }
 
@@ -1100,12 +1103,166 @@ async function openBundle(code){
     if(r){dropState();setTimeout(()=>toast(L(`Đã nạp ${r.cards} thẻ cùng lịch sử học`,`Loaded ${r.cards} cards with history`)),300)}}
   catch(e){console.warn(e);setTimeout(()=>toast(L('Chưa nạp được bộ thẻ','Could not load the card collection')),300)}
 }
+/* shiratama — đồng bộ tiến độ giữa các máy (Firestore REST, không cần SDK)
+   Dữ liệu nằm ở shiratama/{mã-băm}/s/{0..15, meta}. Mã băm tính từ mã mở app, nên máy nào nhập cùng mã là cùng một kho.
+   Mỗi thẻ có mt (thời điểm sửa cuối); khi gộp, bản nào mới hơn thì thắng. */
+const SYNC=(()=>{
+  const FB={apiKey:'AIzaSyDa9OOERR8w7kgnkC5cU9-Nr9fZWuusuzU',project:'nihongo-with-na'};
+  const ROOT=`projects/${FB.project}/databases/(default)/documents`;
+  const API='https://firestore.googleapis.com/v1/';
+  const NS=16;
+  let AUTH=ls.get('shiratama-auth',null);
+  let SPACE=null,running=null,again=false,timer=null,track=false;
+  const st={state:'off',at:ls.get('shiratama-syncat',0),err:''};
+  let dirty=ls.get('shiratama-dirty',{});       // id thẻ -> mt
+  let tomb=ls.get('shiratama-tomb',{});          // id thẻ đã xóa -> lúc xóa
+  let metaDirty=ls.get('shiratama-metad',0);
+  const saveDirty=()=>{ls.set('shiratama-dirty',dirty);ls.set('shiratama-tomb',tomb);ls.set('shiratama-metad',metaDirty)};
+
+  async function idToken(){
+    if(AUTH&&AUTH.exp>Date.now()+120000)return AUTH.idToken;
+    let r,j;
+    if(AUTH&&AUTH.refreshToken){
+      r=await fetch('https://securetoken.googleapis.com/v1/token?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(AUTH.refreshToken)});
+      if(r.ok){j=await r.json();AUTH={idToken:j.id_token,refreshToken:j.refresh_token,exp:Date.now()+(+j.expires_in)*1000};ls.set('shiratama-auth',AUTH);return AUTH.idToken}
+    }
+    r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"returnSecureToken":true}'});
+    if(!r.ok)throw new Error('auth '+r.status);
+    j=await r.json();AUTH={idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn)*1000};ls.set('shiratama-auth',AUTH);return AUTH.idToken;
+  }
+  async function spaceOf(code){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shiratama-sync|'+code.trim()));return [...new Uint8Array(b)].slice(0,20).map(x=>x.toString(16).padStart(2,'0')).join('')}
+  const docs=()=>[...Array(NS).keys()].map(String).concat('meta');
+  const path=k=>`shiratama/${SPACE}/s/${k}`;
+  async function pull(){
+    const r=await fetch(API+ROOT+':batchGet',{method:'POST',headers:{Authorization:'Bearer '+await idToken(),'Content-Type':'application/json'},body:JSON.stringify({documents:docs().map(k=>ROOT+'/'+path(k))})});
+    if(!r.ok){const e=new Error('pull '+r.status);e.status=r.status;throw e}
+    const out={};
+    (await r.json()).forEach(x=>{if(x.found){const k=x.found.name.split('/').pop();let data={};try{data=JSON.parse(x.found.fields.data.stringValue||'{}')}catch(e){}out[k]={data,ut:x.found.updateTime}}else if(x.missing){out[x.missing.split('/').pop()]={data:{},ut:null}}});
+    docs().forEach(k=>{if(!out[k])out[k]={data:{},ut:null}});
+    return out;
+  }
+  async function push(k,data,ut){
+    const s=JSON.stringify(data);if(s.length>890000)throw new Error('shard '+k+' too big');
+    const q='?updateMask.fieldPaths=data&updateMask.fieldPaths=updated&'+(ut?'currentDocument.updateTime='+encodeURIComponent(ut):'currentDocument.exists=false');
+    const r=await fetch(API+ROOT+'/'+path(k)+q,{method:'PATCH',headers:{Authorization:'Bearer '+await idToken(),'Content-Type':'application/json'},body:JSON.stringify({fields:{data:{stringValue:s},updated:{integerValue:String(Date.now())}}})});
+    if(!r.ok){const e=new Error('push '+r.status);e.status=r.status;throw e}
+  }
+  const shardOf=id=>{let h=0;for(let i=0;i<id.length;i++)h=(h*31+id.charCodeAt(i))|0;return String(Math.abs(h)%NS)};
+  const cut=()=>(+ls.get('shiratama-colv',0)||0)*1000;  // lịch sử trước mốc này đã có sẵn trong bộ thẻ
+  const HEAVY=['front','back','fl','guid','nid','created','ord','tmpl','css'];
+  async function recOf(c){
+    const rec={mt:c.mt||c.appAt||Date.now(),card:c.card,susp:c.susp||0,tags:c.tags||'',deck:c.deck,buried:c.buried||null,appAt:c.appAt||0};
+    if(c.edited||c.id[0]==='n'){HEAVY.forEach(k=>{if(c[k]!==undefined)rec[k]=c[k]});rec.edited=c.edited||0;rec.full=1}
+    const rv=await ANKI.getRev(c.id);const t0=cut();if(rv&&rv.logs){const l=rv.logs.filter(x=>x[0]>t0);if(l.length)rec.l=l}
+    return rec;
+  }
+  // ghi vào máy mà không đánh dấu là "cần gửi đi"
+  const raw={};
+  async function applyRemote(R){
+    let changed=0;const cards=await raw.all('cards');const byId=new Map(cards.map(c=>[c.id,c]));
+    const puts=[],dels=[];const revs=[];
+    for(const k of Object.keys(R)){if(k==='meta')continue;const data=R[k].data;
+      for(const id in data){const rec=data[id];const loc=byId.get(id);const lmt=loc?(loc.mt||loc.appAt||0):0;
+        if(dirty[id]&&dirty[id]>=rec.mt)continue;
+        if(rec.x){if(loc&&rec.mt>lmt){dels.push(id);changed++}continue}
+        if(rec.mt<=lmt)continue;
+        if(loc&&loc.card&&rec.card&&new Date(loc.card.last_review||0)>new Date(rec.card.last_review||0))continue;
+        if(!loc&&!rec.full)continue;
+        const c=Object.assign({},loc||{id},{card:rec.card,susp:rec.susp,tags:rec.tags,deck:rec.deck,buried:rec.buried,appAt:rec.appAt,mt:rec.mt});
+        if(rec.full)HEAVY.concat('edited').forEach(f=>{if(rec[f]!==undefined)c[f]=rec[f]});
+        puts.push(c);changed++;
+        if(rec.l)revs.push([id,rec.l])}}
+    if(puts.length)await raw.putMany('cards',puts);
+    for(const id of dels)await raw.del('cards',id);
+    for(const [id,l] of revs){const rv=(await ANKI.getRev(id))||{id,logs:[]};const have=new Set(rv.logs.map(x=>x[0]));let add=0;l.forEach(x=>{if(!have.has(x[0])){rv.logs.push(x);add++}});if(add){rv.logs.sort((a,b)=>a[0]-b[0]);await raw.put('revlog',rv)}}
+    // deck và bộ cài đặt
+    const M=R.meta&&R.meta.data;
+    if(M&&M.mt&&M.mt>(ls.get('shiratama-metamt',0)||0)&&!(metaDirty&&metaDirty>=M.mt)){
+      const ld=await raw.all('decks');const lm=new Map(ld.map(d=>[d.id,d]));
+      const up=(M.decks||[]).map(d=>Object.assign({},lm.get(d.id)||{},d));if(up.length)await raw.putMany('decks',up);
+      for(const id of (M.dx||[]))if(lm.has(id))await raw.del('decks',id);
+      if(M.presets)ls.set('shiratama-presets',M.presets);
+      ls.set('shiratama-metamt',M.mt);changed++}
+    return changed;
+  }
+  async function once(){
+    const t0=Date.now();
+    const R=await pull();
+    const changed=await applyRemote(R);
+    // gửi phần đã đổi trên máy này
+    const ids=Object.keys(dirty).concat(Object.keys(tomb));
+    if(ids.length){
+      const cards=await raw.all('cards');const byId=new Map(cards.map(c=>[c.id,c]));
+      const by={};ids.forEach(id=>{(by[shardOf(id)]=by[shardOf(id)]||[]).push(id)});
+      for(const k of Object.keys(by)){const data=Object.assign({},R[k].data);
+        for(const id of by[k]){if(tomb[id]){const r=data[id];if(!r||r.mt<tomb[id])data[id]={x:1,mt:tomb[id]};continue}
+          const c=byId.get(id);if(!c)continue;const rec=await recOf(c);const r=data[id];if(!r||r.mt<=rec.mt)data[id]=rec}
+        await push(k,data,R[k].ut)}
+    }
+    if(metaDirty){const decks=(await raw.all('decks')).map(d=>({id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0}));
+      const M=R.meta.data||{};const dx=(M.dx||[]).slice();(ls.get('shiratama-deckdel',[])||[]).forEach(id=>{if(!dx.includes(id))dx.push(id)});
+      const mt=Math.max(metaDirty,Date.now());await push('meta',{mt,decks,dx,presets:ls.get('shiratama-presets',null)},R.meta.ut);ls.set('shiratama-metamt',mt)}
+    // xóa đánh dấu những gì đã gửi xong (thẻ sửa trong lúc đang đồng bộ thì giữ lại cho lần sau)
+    ids.forEach(id=>{if(dirty[id]&&dirty[id]<=t0)delete dirty[id];if(tomb[id]&&tomb[id]<=t0)delete tomb[id]});
+    if(metaDirty&&metaDirty<=t0)metaDirty=0;saveDirty();
+    return changed;
+  }
+  function paint(){document.querySelectorAll('[data-sync]').forEach(el=>{el.className='syncchip '+st.state;el.innerHTML=chipInner()});const s=document.getElementById('sysync');if(s)s.innerHTML=detail()}
+  const hm=t=>new Date(t).toLocaleTimeString(L('vi-VN','en-GB'),{hour:'2-digit',minute:'2-digit'});
+  function ago(t){if(!t)return L('chưa lần nào','never');const d=new Date(t),n=new Date();const same=d.toDateString()===n.toDateString();return same?L('lúc ','at ')+hm(t):d.toLocaleDateString(L('vi-VN','en-GB'))+' '+hm(t)}
+  const CLOUD='<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z"/></svg>';
+  function chipInner(){const n=Object.keys(dirty).length+Object.keys(tomb).length;
+    if(st.state==='busy')return CLOUD+'<span>'+L('Đang đồng bộ…','Syncing…')+'</span>';
+    if(st.state==='rules')return CLOUD+'<span>'+L('Chưa bật đồng bộ','Sync not set up')+'</span>';
+    if(st.state==='err')return CLOUD+'<span>'+L('Lỗi đồng bộ','Sync error')+'</span>';
+    if(st.state==='offline')return CLOUD+'<span>'+L('Mất mạng','Offline')+(n?` · ${n}`:'')+'</span>';
+    return CLOUD+'<span>'+(st.at?L('Đã đồng bộ ','Synced ')+hm(st.at):L('Chưa đồng bộ','Not synced'))+'</span>'}
+  function detail(){const n=Object.keys(dirty).length+Object.keys(tomb).length;
+    return `<div class="kv"><span>${L('Đồng bộ lần cuối','Last synced')}</span><b>${ago(st.at)}</b><span>${L('Thay đổi chờ gửi','Changes waiting')}</span><b>${n}${metaDirty?' + deck':''}</b><span>${L('Trạng thái','Status')}</span><b>${{ok:L('Ổn','OK'),busy:L('Đang đồng bộ…','Syncing…'),err:L('Lỗi','Error'),offline:L('Mất mạng','Offline'),rules:L('Chưa bật trên máy chủ','Not enabled on the server'),off:'—'}[st.state]||'—'}</b></div>${st.err?`<div class="ohint">${esc(st.err)}</div>`:''}`}
+  async function run(){
+    if(!SPACE)return;if(running){again=true;return running}
+    st.state='busy';paint();
+    running=(async()=>{try{let ch=await once();if(again){again=false;ch+=await once()}
+        st.state='ok';st.err='';st.at=Date.now();ls.set('shiratama-syncat',st.at);
+        if(ch){dropState();if(!AK&&!SS&&!document.querySelector('.veil')&&['home','stats','sys'].includes(TAB))render()}}
+      catch(e){console.warn('sync',e);
+        if(!navigator.onLine||e instanceof TypeError){st.state='offline';st.err=''}
+        else if(e.status===403){st.state='rules';st.err=L('Máy chủ chưa cho phép lưu dữ liệu Shiratama. Cần thêm quy tắc Firestore (xem hướng dẫn).','The server does not allow Shiratama data yet.')}
+        else if(e.status===400||e.status===409||e.status===412){st.state='ok';again=true}   // máy khác vừa ghi: thử lại
+        else{st.state='err';st.err=String(e.message||e)}}
+      finally{running=null;paint();if(again){again=false;setTimeout(run,800)}}})();
+    return running;
+  }
+  const soon=()=>{clearTimeout(timer);timer=setTimeout(run,12000)};
+  function wrap(){
+    ['put','putMany','del','delDeck','all'].forEach(k=>raw[k]=ANKI[k]);
+    const mark=c=>{const t=Date.now();c.mt=t;dirty[c.id]=t};
+    ANKI.put=async(store,v)=>{if(track&&store==='cards'){mark(v);saveDirty();soon()}if(track&&store==='decks'){metaDirty=Date.now();saveDirty();soon()}return raw.put(store,v)};
+    ANKI.putMany=async(store,arr)=>{if(track&&store==='cards'){arr.forEach(mark);saveDirty();soon()}if(track&&store==='decks'){metaDirty=Date.now();saveDirty();soon()}return raw.putMany(store,arr)};
+    ANKI.del=async(store,id)=>{if(track&&store==='cards'){tomb[id]=Date.now();delete dirty[id];saveDirty();soon()}return raw.del(store,id)};
+    ANKI.delDeck=async(id)=>{if(track){const cs=(await raw.all('cards')).filter(c=>c.deck===id);const t=Date.now();cs.forEach(c=>{tomb[c.id]=t;delete dirty[c.id]});const dd=ls.get('shiratama-deckdel',[])||[];dd.push(id);ls.set('shiratama-deckdel',dd);metaDirty=t;saveDirty();soon()}return raw.delDeck(id)};
+    const sp=savePresets;savePresets=p=>{sp(p);if(track){metaDirty=Date.now();saveDirty();soon()}};
+  }
+  async function start(code){
+    if(!window.ANKI||SPACE)return;
+    SPACE=await spaceOf(code);wrap();
+    // lần đầu trên máy này: gửi những thẻ đã học hoặc sửa trong app trước khi có đồng bộ
+    if(!ls.get('shiratama-syncinit',0)){const cs=await raw.all('cards');cs.forEach(c=>{if(c.appAt||c.edited||c.id[0]==='n')dirty[c.id]=c.appAt||Date.now()});metaDirty=Date.now();saveDirty();ls.set('shiratama-syncinit',1)}
+    track=true;run();
+    setInterval(()=>{if(!document.hidden)run()},90000);
+    document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Object.keys(dirty).length||Object.keys(tomb).length||metaDirty)run()}else run()});
+    window.addEventListener('online',run);
+    document.addEventListener('click',e=>{if(e.target.closest('[data-sync]'))run()});
+  }
+  return {start,run,chip:()=>`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st}};
+})();
+
 /* ---------- boot ---------- */
 (async()=>{
   const c=ls.get('shiratama-code',null);
   if(c){try{DATA=await loadContent(c);indexData()}catch(e){DATA=null}}
   if(DATA)await openBundle(c);
-  render();FLYBY.start();
+  render();if(DATA)SYNC.start(c);FLYBY.start();
   const it=document.getElementById('intro');if(it){const wait=Math.max(0,1800-(Date.now()-(window.T0||0)));setTimeout(()=>{it.classList.add('out');setTimeout(()=>it.remove(),700)},wait)}
 })();
 })();

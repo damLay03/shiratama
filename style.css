@@ -645,3 +645,13 @@ body.studying .cloud{animation-duration:var(--dur)}
 :root[data-mode="night"] .intro-name{text-shadow:0 2px 14px rgba(0,0,0,.5)}
 .intro-msg{color:#4f6079}
 :root[data-mode="night"] .intro-msg{color:#bdc5ea}
+/* đồng bộ */
+.syncchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);color:var(--ink2);border-radius:999px;padding:6px 11px;font:600 12.5px/1 inherit;font-family:inherit;cursor:pointer;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);white-space:nowrap}
+.syncchip svg{flex:none}
+.syncchip.ok svg{color:var(--ok)}
+.syncchip.busy svg{animation:syncp 1s ease-in-out infinite}
+.syncchip.err,.syncchip.rules{color:var(--ng);border-color:var(--ng)}
+.syncchip.offline{color:var(--ink3)}
+@keyframes syncp{50%{opacity:.35}}
+#sysync .kv{margin-top:6px}
+@media (min-width:1280px){.top .syncchip{position:fixed;left:20px;bottom:20px}}

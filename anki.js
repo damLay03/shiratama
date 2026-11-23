@@ -169,7 +169,7 @@ async function loadBundle(code,onStep){
   const prev={};(await all('cards')).forEach(x=>prev[x.id]=x);
   const ids=new Set();let kept=0;
   const cards=B.cards.map(c=>{ids.add(c.id);const o=prev[c.id];const lr=c.card.last_review?new Date(c.card.last_review).getTime():0;
-    if(o&&o.appAt&&o.appAt>lr){kept++;return Object.assign({},c,{card:o.card,appAt:o.appAt,susp:o.susp,front:o.edited?o.front:c.front,back:o.edited?o.back:c.back})}return c});
+    if(o&&o.appAt&&o.appAt>lr){kept++;return Object.assign({},c,{card:o.card,appAt:o.appAt,susp:o.susp,mt:o.mt,edited:o.edited,tags:o.tags??c.tags,buried:o.buried,front:o.edited?o.front:c.front,back:o.edited?o.back:c.back})}return c});
   await putMany('decks',B.decks);await putMany('cards',cards);
   // lịch sử ôn: gộp với lượt ôn đã làm trong app
   const oldRev={};(await all('revlog')).forEach(r=>oldRev[r.id]=r.logs);

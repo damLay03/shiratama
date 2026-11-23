@@ -328,7 +328,10 @@ const GRAM=(()=>{let key=null,idx=null,loading=null;
     try{return await loading}catch(e){loading=null;throw e}}
   async function blob(path){await load();const r=await fetch(`data/gram/${path}.bin?g=1`);if(!r.ok)throw new Error('http');const b=new Uint8Array(await r.arrayBuffer());
     const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));return new Blob([p],{type:'image/webp'})}
-  return {load,blob};
+  // thẻ ngữ pháp dạng chữ (HTML tiếng Việt), cũng mã hóa vì repo công khai
+  let html=null;async function htmlAll(){if(html)return html;await load();const r=await fetch('data/gram/html.enc.json?v='+window.APPV);if(!r.ok)return {v:0};const e=await r.json();
+    const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.data));html=JSON.parse(new TextDecoder().decode(p));return html}
+  return {load,blob,htmlAll};
 })();
 const GLV=['N5','N4','N3','N2','N1'];
 // tên mẫu: "一番 いちばん" -> 一番（いちばん）, "ちゃいけない じゃだめ" -> ちゃいけない / じゃだめ; dòng dưới là romaji
@@ -337,19 +340,20 @@ function gFront(x){const t=[...new Set(String(x.jp).replace(/\s+[A-Za-z][A-Za-z 
   const jp=t.length===2&&kan(t[0])&&kana(t[1])?`${t[0]}（${t[1]}）`:t.join(' / ');
   return `${esc(jp)}<div class="ro">${esc(String(x.ro).replace(/\s*particle$/,''))}</div>`}
 async function seedGram(){
-  if(ls.get('shiratama-gramseed',0)>=3||!window.ANKI)return;
-  try{const g=await GRAM.load();const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
+  if(!window.ANKI)return;
+  let H={v:0};try{if(ls.get('shiratama-gramseed',0)>=3){H=await GRAM.htmlAll();if((H.v||0)<=ls.get('shiratama-gramhtml',0))return}}catch(e){return}
+  try{const g=await GRAM.load();if(!H.v)H=await GRAM.htmlAll().catch(()=>({v:0}));const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
     const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
     if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
     const cards=[];const t0=Date.UTC(2026,10,23);
     GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}
       g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;const tag=x.s?'s':'r';
         // thẻ một mặt: tên (ẩn khi lướt, dùng để tìm) + ảnh; không có mặt sau
-        const front=`<div class="gt">${gFront(x)}</div><img src="gram:${lv}/${n}${tag}">`,back='';
+        const hx=H[lv]&&H[lv][n];const front=hx||`<div class="gt">${gFront(x)}</div><img src="gram:${lv}/${n}${tag}">`,back='';
         if(have.has(id)){const c=old[id];if(!c.edited&&c.front!==front){c.front=front;c.fl=[front,back];c.back=front+'<hr id=answer>';fix.push(c)}return}
         cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>',tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
     if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);if(fix.length)await ANKI.putMany('cards',fix);
-    ls.set('shiratama-gramseed',3);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
+    ls.set('shiratama-gramseed',3);ls.set('shiratama-gramhtml',H.v||0);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
 }
 // ảnh trong thẻ mà máy chưa có: ảnh ngữ pháp mã hóa, hoặc ảnh anh tự thêm ở máy khác
 window.ANKI_FB=async n=>{if(n.startsWith('gram:'))return GRAM.blob(n.slice(5));return SYNC.getMedia(n)};
@@ -385,7 +389,9 @@ function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
 function bindFlipTop(){const F=FV;
   $('#fvonly').onclick=()=>{if(!F.only&&!F.all.some(isStar)){toast(L('Chưa có thẻ ★ nào','No starred cards yet'));return}F.only=!F.only;S.flipOnly=S.flipOnly||{};S.flipOnly[F.name]=F.only;save();F.i=0;flipItems();render()};
   $('#fvsh').onclick=()=>{F.shuf=!F.shuf;F.shufOrder=F.shuf?shuffle(F.all):null;F.i=0;flipItems();toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));render()}}
-function cardTitle(c){const f=String(c.front);const ro=(f.match(/<div class="ro">([\s\S]*?)<\/div>/)||[])[1];const g=f.replace(/<div class="ro">[\s\S]*?<\/div>/,'');
+function cardTitle(c){const f=String(c.front);
+  const gp=f.match(/<div class="gc-p">([\s\S]*?)<\/div>/);if(gp){const gr=f.match(/<div class="gc-r">([\s\S]*?)<\/div>/),gm=f.match(/<div class="gc-m">([\s\S]*?)<\/div>/);
+    return {t:stripHtml(gp[1]).trim(),sub:[gr&&stripHtml(gr[1]).trim(),gm&&stripHtml(gm[1]).trim()].filter(Boolean).join(' · '),im:false}}const ro=(f.match(/<div class="ro">([\s\S]*?)<\/div>/)||[])[1];const g=f.replace(/<div class="ro">[\s\S]*?<\/div>/,'');
   const m=g.split(/<br\s*\/?>|<img/i);const t=stripHtml(m[0]).trim();const sub=ro!=null?stripHtml(ro).trim():stripHtml(g.slice(m[0].length)).trim();
   return {t:t||(/<img/i.test(f)?L('(ảnh)','(image)'):''),sub,im:!t&&/<img/i.test(f)}}
 function renderFlipList(){

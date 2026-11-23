@@ -734,7 +734,8 @@ function renderAnki(){
     // thẻ khó nhớ (leech)
     let leech=false;if(was===2&&g===1){const n=it.card.lapses||0;if(n>=P.leechN&&(n-P.leechN)%Math.max(1,Math.ceil(P.leechN/2))===0){leech=true;const s=new Set((it.tags||'').split(/\s+/).filter(Boolean));s.add('leech');it.tags=[...s].join(' ');if(P.leechAct==='suspend')it.susp=1}}
     const sib=[];if((was===0&&P.buryNew)||(was===2&&P.buryRev)){AK.list.slice(AK.i+1).forEach(c=>{if(c.nid&&c.nid===it.nid&&c.id!==it.id&&c.card.state!==1&&c.card.state!==3){c.buried=dayKey();sib.push(c)}})}
-    try{await ANKI.put('cards',it);if(sib.length)await ANKI.putMany('cards',sib);await ANKI.logReview(it.id,[Date.now(),g,it.card.state===2?it.card.scheduled_days:-Math.round((new Date(it.card.due)-Date.now())/1000),revType(was),ms])}catch(e){toast(L('Không lưu được thẻ','Could not save the card'))}
+    try{await ANKI.put('cards',it);if(sib.length)await ANKI.putMany('cards',sib)}catch(e){console.error(e);toast(L('Không lưu được thẻ, anh tải lại trang giúp em','Could not save the card, please reload'))}
+    try{await ANKI.logReview(it.id,[Date.now(),g,it.card.state===2?it.card.scheduled_days:-Math.round((new Date(it.card.due)-Date.now())/1000),revType(was),ms])}catch(e){console.warn('revlog',e)}
     if(leech)toast(P.leechAct==='suspend'?L('Thẻ khó nhớ, đã tạm ẩn','Leech: card suspended'):L('Thẻ khó nhớ, đã gắn tag leech','Leech: tagged'));
     D.n++;D.ms+=ms;if(g===1)D.again++;
     if(was===0){D.nw[it.deck]=(D.nw[it.deck]||0)+1}else if(was===2){D.rv[it.deck]=(D.rv[it.deck]||0)+1}

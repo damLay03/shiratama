@@ -18,11 +18,13 @@ function db(){return dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open(DB
   if(!has('cards'))d.createObjectStore('cards',{keyPath:'id'}).createIndex('deck','deck');
   if(!has('decks'))d.createObjectStore('decks',{keyPath:'id'});
   if(!has('media'))d.createObjectStore('media',{keyPath:'name'});
-  if(!has('revlog'))d.createObjectStore('revlog',{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))}
-async function tx(store,mode,fn){const d=await db();return new Promise((res,rej)=>{const t=d.transaction(store,mode);const out=fn(t.objectStore(store));t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error)})}
+  if(!has('revlog'))d.createObjectStore('revlog',{keyPath:'id'})};r.onsuccess=()=>{const d=r.result;d.onclose=()=>{dbp=null};d.onversionchange=()=>{d.close();dbp=null};res(d)};r.onerror=()=>{dbp=null;rej(r.error)};r.onblocked=()=>{}}))}
+// máy để lâu ở nền có thể đóng kết nối IndexedDB: mở lại và thử thêm một lần
+async function withDb(run){try{return await run(await db())}catch(e){if(e&&(e.name==='InvalidStateError'||e.name==='TransactionInactiveError'||/clos/i.test(e.message||''))){dbp=null;return await run(await db())}throw e}}
+function tx(store,mode,fn){return withDb(d=>new Promise((res,rej)=>{const t=d.transaction(store,mode);const out=fn(t.objectStore(store));t.oncomplete=()=>res(out instanceof IDBRequest?out.result:out);t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'))}))}
 const all=(store)=>tx(store,'readonly',s=>s.getAll());
 const put=(store,v)=>tx(store,'readwrite',s=>s.put(v));
-async function putMany(store,arr){const d=await db();return new Promise((res,rej)=>{const t=d.transaction(store,'readwrite');const s=t.objectStore(store);arr.forEach(v=>s.put(v));t.oncomplete=res;t.onerror=()=>rej(t.error)})}
+function putMany(store,arr){return withDb(d=>new Promise((res,rej)=>{const t=d.transaction(store,'readwrite');const s=t.objectStore(store);arr.forEach(v=>s.put(v));t.oncomplete=res;t.onerror=()=>rej(t.error);t.onabort=()=>rej(t.error||new Error('abort'))}))}
 async function delDeck(id){const d=await db();const cards=(await all('cards')).filter(c=>c.deck===id);return new Promise((res,rej)=>{const t=d.transaction(['cards','decks'],'readwrite');cards.forEach(c=>t.objectStore('cards').delete(c.id));t.objectStore('decks').delete(id);t.oncomplete=res;t.onerror=()=>rej(t.error)})}
 
 /* ---------- protobuf (đọc chuỗi trong cấu hình template của Anki mới) ---------- */
@@ -194,7 +196,7 @@ async function hydrate(el){const imgs=el.querySelectorAll('img[src]');for(const 
   try{if(!urlCache[n]){const m=await tx('media','readonly',s=>s.get(n));const blob=m?m.blob:await mediaFromBundle(n);if(blob)urlCache[n]=URL.createObjectURL(blob)}}catch(e){}
   if(urlCache[n])im.src=urlCache[n]}}
 
-async function logReview(id,entry){const r=await tx('revlog','readonly',s=>s.get(id));const row=r||{id,logs:[]};row.logs.push(entry);await put('revlog',row)}
+async function logReview(id,entry){const r=await tx('revlog','readonly',s=>s.get(id));const row=(r&&Array.isArray(r.logs))?r:{id,logs:[]};row.logs.push(entry);await put('revlog',row)}
 async function getRev(id){return tx('revlog','readonly',s=>s.get(id))}
 const del=(store,id)=>tx(store,'readwrite',s=>s.delete(id));
 

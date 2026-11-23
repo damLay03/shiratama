@@ -183,7 +183,7 @@ function shell(inner,{tabs=true}={}){
   const same=LASTPAGE===TAB+'|'+(AK?1:0);LASTPAGE=TAB+'|'+(AK?1:0);
   $('#app').innerHTML=`<div class="wrap ${same?'':'enter'}">${inner}</div>`+(tabs?`<nav class="tabs">
    ${[['home',I.cards,L('Học thẻ','Study')],['exam',I.test,L('Luyện đề','Practice')],['sys',I.gear,L('Hệ thống','System')]].map(([k,j,v])=>`<button data-tab="${k}" class="${mainTab()===k?'on':''}"><b>${j}</b>${v}</button>`).join('')}</nav>`:'');
-  $$('[data-tab]').forEach(b=>b.onclick=()=>{const k=b.dataset.tab;TAB=k==='home'?(S.lastStudy||'home'):k==='exam'?(S.lastExam||'exam'):k;if(TIP)TIP.style.display='none';render()});
+  $$('[data-tab]').forEach(b=>b.onclick=()=>{const k=b.dataset.tab;if(k==='exam')EXD=null;TAB=k==='home'?(S.lastStudy||'home'):k==='exam'?(S.lastExam||'exam'):k;if(TIP)TIP.style.display='none';render()});
   $$('[data-sub]').forEach(b=>b.onclick=()=>{TAB=b.dataset.sub;if(STUDY_SUB.includes(TAB))S.lastStudy=TAB;else if(EXAM_SUB.includes(TAB))S.lastExam=TAB;save();BR.pick=null;if(TIP)TIP.style.display='none';render()});
   window.scrollTo(0,0);
 }
@@ -475,22 +475,34 @@ function lockScreen(err){
 }
 
 /* ---------- đề thi ---------- */
+let EXD=null; // đề đang mở (null = danh sách đề)
 function examList(){
-  const exs=examsSorted();const ex=exs.find(e=>e.id===S.exSel)||exs[0];
-  const hist=(S.exams[ex.id]||[]).slice(-5).reverse();
-  const due=dueIds().length;
+  const exs=examsSorted();
+  if(EXD&&exs.find(e=>e.id===EXD))return examDetail(exs.find(e=>e.id===EXD));
+  const row=e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;const H=S.exams[e.id]||[];
+    const best=p=>{const h=H.filter(x=>x.name===p.name);if(!h.length)return null;return h.reduce((m,x)=>x.c/x.n>m.c/m.n?x:m)};
+    return `<button class="exrow" data-exo="${esc(e.id)}"><div class="exd"><b>${esc(exShort(e))}</b><small>JLPT N3</small></div>
+      <div class="exparts">${e.parts.map(p=>{const bb=best(p);return `<span class="expt ${bb?(bb.c/bb.n>=.6?'ok':'ng'):''}"><i>${esc(LL({'moji':['Từ vựng','Vocab'],'bunpou+dokkai':['Ngữ pháp · Đọc','Grammar · Reading'],'choukai':['Nghe','Listening']}[p.key])||partName(p))}</i><b>${bb?`${bb.c}/${bb.n}`:'–'}</b></span>`}).join('')}</div>
+      <div class="exprog"><div class="meter" style="max-width:none"><i style="width:${n?d/n*100:0}%"></i></div><small>${d?`${d}/${n} ${L('câu','Qs')}`:L('chưa làm','not started')}</small></div><span class="exgo">›</span></button>`};
   shell(`${header()}
-  <div class="h">${L('Luyện theo phần','Practice by section')}</div>
+  <div class="h">${L('Đề thi thật','Real tests')} · ${exs.length} ${L('đề','tests')}</div>
+  <div class="exlist">${exs.map(row).join('')}</div>
+  <div class="h">${L('Luyện theo phần (trộn câu từ mọi đề)','Practice by section (mixed)')}</div>
   <div class="secgrid">${Object.keys(SEC).map(k=>{const qs=allBy(k);const t=qs.filter(q=>S.ans[q.id]).length;return `<button class="sec" data-prac="${k}"><div style="font-weight:800">${secName(k)}</div><div class="tiny" style="margin-top:6px">${t}/${qs.length} ${L('câu đã làm','done')}</div></button>`}).join('')}</div>
-  <div class="h">${L('Đề thi thật','Real tests')}</div>
-  <div class="exchips">${exs.map(e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;return `<button class="exchip ${e===ex?'on':''}" data-exsel="${esc(e.id)}"><b>${esc(exShort(e))}</b><small>${d?`${d}/${n}`:L('chưa làm','new')}</small></button>`}).join('')}</div>
-  <div class="card"><div style="font-size:19px;font-weight:800">${esc(examTitle(ex))}</div><div class="tiny" style="margin-top:2px">${esc(ex.note?L(ex.note,ex.note):L('Nguồn: jlpt.jp · đáp án chính thức','Source: jlpt.jp · official answers'))}</div></div>
+  `);
+  $$('[data-exo]').forEach(b=>b.onclick=()=>{EXD=b.dataset.exo;S.exSel=EXD;save();examList()});
+  $$('[data-prac]').forEach(b=>b.onclick=()=>startPractice(b.dataset.prac));
+}
+function examDetail(ex){
+  const hist=(S.exams[ex.id]||[]).slice(-5).reverse();
+  shell(`${header()}
+  <button class="btn line sm exback" id="exback">‹ ${L('Tất cả đề','All tests')}</button>
+  <div class="card"><div style="font-size:21px;font-weight:800">${esc(examTitle(ex))}</div><div class="tiny" style="margin-top:2px">${esc(ex.note?L(ex.note,ex.note):'')}</div></div>
   ${ex.parts.map((p,i)=>{const qs=partQs(ex,p);return `<div class="card"><div style="font-size:17px;font-weight:800">${partName(p)}</div><div class="tiny">${qs.length} ${L('câu','questions')} · ${p.min} ${L('phút','min')}</div>
    <div class="row" style="margin-top:12px"><button class="btn bee" data-ex="${i}">${L('Thi thật','Timed test')}</button><button class="btn line" data-exp="${i}">${L('Luyện từng câu','One by one')}</button></div></div>`}).join('')}
   ${hist.length?`<div class="h">${L('Lần làm gần đây','Recent attempts')}</div><div class="card">${hist.map(h=>`<div class="list-item"><div class="grow"><div>${esc(partName(ex.parts.find(p=>p.name===h.name)||{name:h.name}))}</div><div class="tiny">${new Date(h.at).toLocaleString(L('vi-VN','en-GB'))}</div></div><b>${h.c}/${h.n}</b></div>`).join('')}</div>`:''}
   `);
-  $$('[data-exsel]').forEach(b=>b.onclick=()=>{S.exSel=b.dataset.exsel;save();examList()});
-  $$('[data-prac]').forEach(b=>b.onclick=()=>startPractice(b.dataset.prac));
+  $('#exback').onclick=()=>{EXD=null;examList()};
   $$('[data-ex]').forEach(b=>b.onclick=()=>startExam(ex,ex.parts[+b.dataset.ex],true));
   $$('[data-exp]').forEach(b=>b.onclick=()=>startExam(ex,ex.parts[+b.dataset.exp],false));
 }

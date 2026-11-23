@@ -796,3 +796,17 @@ body.studying .cloud{animation-duration:var(--dur)}
   .sysgrid>.card{break-inside:avoid;margin:0 0 18px;display:block;width:100%}
 }
 .sysgrid .jp.grow{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:clip}
+/* v50: danh sách đề */
+.exlist{display:grid;gap:10px}
+.exrow{display:grid;grid-template-columns:92px minmax(0,1fr) 22px;grid-template-areas:"d p g" "d r g";gap:6px 14px;align-items:center;width:100%;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;border-radius:18px;padding:14px 16px;cursor:pointer;box-shadow:var(--shadow);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.exrow:hover{border-color:var(--bee-deep)}
+.exd{grid-area:d}.exd b{display:block;font-size:20px;font-weight:800}.exd small{font-size:12px;color:var(--ink3)}
+.exparts{grid-area:p;display:flex;flex-wrap:wrap;gap:6px}
+.expt{display:inline-flex;gap:6px;align-items:center;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--line)}
+.expt i{font-style:normal;color:var(--ink3)}.expt b{font-variant-numeric:tabular-nums}
+.expt.ok b{color:var(--ok)}.expt.ng b{color:var(--ng)}
+.exprog{grid-area:r;display:flex;align-items:center;gap:10px}.exprog .meter{flex:1}.exprog small{font-size:12px;color:var(--ink3);white-space:nowrap}
+.exgo{grid-area:g;font-size:24px;color:var(--ink3)}
+.exback{margin-bottom:12px}
+@media (max-width:520px){.exrow{grid-template-columns:70px minmax(0,1fr) 16px;padding:12px}.exd b{font-size:17px}.expt{font-size:11.5px;padding:2px 8px}}
+@media (min-width:1100px){.exlist{grid-template-columns:repeat(2,minmax(0,1fr))}}

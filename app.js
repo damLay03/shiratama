@@ -119,18 +119,54 @@ function audioHTML(q){return `<div class="audio"><button class="play" id="aubtn"
 function bindAudio(q){const b=$('#aubtn');if(!b)return;b.onclick=()=>{if(AUQ===q.id&&!AU.paused){AU.pause();b.innerHTML=I.play}else playSeg(q)};$('#aurestart').onclick=()=>playSeg(q,true)}
 
 /* ---------- khung ---------- */
-const SKY=`<div class="sky"><i class="b1"></i><i class="b2"></i><i class="b3"></i><i class="b4"></i><i class="b5"></i>
-<svg width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">${Array.from({length:70},(_,k)=>{const x=(k*97)%400,y=(k*173)%800,r=(k%5===0)?1.6:(k%3===0?1.1:.7);return `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" opacity="${.35+(k%4)*.15}"/>`}).join('')}</svg></div>`;
-function ensureSky(){if(!document.querySelector('.sky'))document.body.insertAdjacentHTML('afterbegin',SKY)}
+/* ---------- bầu trời động: mây trôi, màu theo giờ, nghiêng máy; đêm là ngân hà ---------- */
+function cloud(cls,top,w,dur,delay,op){return `<div class="cloud ${cls}" style="top:${top}%;--w:${w}px;--dur:${dur}s;animation-delay:-${delay}s;opacity:${op}"><i></i><i></i><i></i><i></i></div>`}
+const STARS=(()=>{let r='';let seed=7;const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
+  for(let k=0;k<150;k++){const x=rnd()*400,y=rnd()*800,big=rnd();const rr=big>.93?1.7:big>.75?1.1:.6;r+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr}" class="tw t${k%4}"/>`}return r})();
+const SKY=`<div class="sky"><div class="sky-grad"></div>
+<div class="sun"></div>
+<div class="sky-l l1">${cloud('c1',8,260,190,20,.9)}${cloud('c2',30,180,150,90,.75)}${cloud('c3',62,300,230,150,.8)}</div>
+<div class="sky-l l2">${cloud('c4',18,200,120,60,.95)}${cloud('c5',48,240,140,10,.85)}${cloud('c6',80,220,160,100,.9)}</div>
+<div class="sky-l l3">${cloud('c7',4,340,95,30,.6)}${cloud('c8',70,380,110,70,.55)}</div>
+<div class="night"><div class="neb n1"></div><div class="neb n2"></div><div class="neb n3"></div><div class="milky"></div>
+<svg class="stars" width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">${STARS}</svg><div id="shoot"></div></div></div>`;
+function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);SKYFX.start()}}
+const SKYFX=(()=>{
+  // màu trời theo giờ (ban ngày): bình minh hồng, trưa xanh, chiều vàng cam
+  const K=[[5,'#f6c9c4','#fde9dc'],[7,'#cfe6f8','#eef6fd'],[11,'#b7dbf7','#e7f4fe'],[15,'#c4e0f6','#eef5fb'],[17,'#f5d2b0','#fcecd9'],[18.5,'#e9b9c6','#f8e2df'],[24,'#e9b9c6','#f8e2df']];
+  const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),mix=(a,b,t)=>'#'+hex(a).map((v,i)=>Math.round(v+(hex(b)[i]-v)*t).toString(16).padStart(2,'0')).join('');
+  function tint(){const d=new Date(),h=d.getHours()+d.getMinutes()/60;let i=0;while(i<K.length-1&&K[i+1][0]<=h)i++;
+    const A=K[i],B=K[Math.min(i+1,K.length-1)];const t=B[0]>A[0]?Math.min(1,Math.max(0,(h-A[0])/(B[0]-A[0]))):0;
+    const r=document.documentElement.style;const hh=h<5?K[0]:null;r.setProperty('--day1',hh?hh[1]:mix(A[1],B[1],t));r.setProperty('--day2',hh?hh[2]:mix(A[2],B[2],t));
+    r.setProperty('--sunx',(10+80*Math.min(1,Math.max(0,(h-6)/12)))+'%');r.setProperty('--suny',(8+28*Math.abs((h-12)/6))+'%')}
+  // nghiêng máy / rê chuột: các lớp mây lệch nhau
+  let tx=0,ty=0,cx=0,cy=0,raf=0;
+  function loop(){cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;const r=document.documentElement.style;r.setProperty('--px',cx.toFixed(3));r.setProperty('--py',cy.toFixed(3));raf=Math.abs(tx-cx)+Math.abs(ty-cy)>.001?requestAnimationFrame(loop):0}
+  const kick=()=>{if(!raf)raf=requestAnimationFrame(loop)};
+  function onOri(e){if(e.gamma==null)return;tx=Math.max(-1,Math.min(1,e.gamma/30));ty=Math.max(-1,Math.min(1,((e.beta||45)-45)/30));kick()}
+  function tilt(){if(S.tilt===0)return;window.addEventListener('deviceorientation',onOri)}
+  function askTilt(){ // iPhone cần anh cho phép một lần
+    const D=window.DeviceOrientationEvent;if(D&&typeof D.requestPermission==='function'){return D.requestPermission().then(r=>{if(r==='granted'){S.tilt=1;save();tilt();return true}return false}).catch(()=>false)}
+    S.tilt=1;save();tilt();return Promise.resolve(true)}
+  // sao băng
+  function shoot(){const el=document.getElementById('shoot');if(el&&isNight()&&!document.hidden){const st=document.createElement('i');st.style.left=(20+Math.random()*70)+'%';st.style.top=(Math.random()*35)+'%';el.appendChild(st);setTimeout(()=>st.remove(),1600)}setTimeout(shoot,6000+Math.random()*14000)}
+  let started=false;
+  return {start(){if(started)return;started=true;tint();setInterval(tint,120000);
+      window.addEventListener('pointermove',e=>{if(e.pointerType!=='mouse')return;tx=(e.clientX/innerWidth-.5)*1.4;ty=(e.clientY/innerHeight-.5)*1.4;kick()},{passive:true});
+      const D=window.DeviceOrientationEvent;if(D&&typeof D.requestPermission!=='function')tilt();else if(S.tilt===1){const once=()=>{askTilt();document.removeEventListener('pointerup',once)};document.addEventListener('pointerup',once)}
+      setTimeout(shoot,4000)},askTilt,needsAsk:()=>{const D=window.DeviceOrientationEvent;return !!(D&&typeof D.requestPermission==='function')}};
+})();
 function shell(inner,{tabs=true}={}){
-  ensureSky();
-  $('#app').innerHTML=`<div class="wrap">${inner}</div>`+(tabs?`<nav class="tabs">
+  ensureSky();document.body.classList.remove('studying');
+  const same=LASTPAGE===TAB+'|'+(AK?1:0);LASTPAGE=TAB+'|'+(AK?1:0);
+  $('#app').innerHTML=`<div class="wrap ${same?'':'enter'}">${inner}</div>`+(tabs?`<nav class="tabs">
    ${[['home',I.cards,L('Học thẻ','Study')],['exam',I.test,L('Luyện đề','Practice')],['sys',I.gear,L('Hệ thống','System')]].map(([k,j,v])=>`<button data-tab="${k}" class="${mainTab()===k?'on':''}"><b>${j}</b>${v}</button>`).join('')}</nav>`:'');
   $$('[data-tab]').forEach(b=>b.onclick=()=>{const k=b.dataset.tab;TAB=k==='home'?(S.lastStudy||'home'):k==='exam'?(S.lastExam||'exam'):k;if(TIP)TIP.style.display='none';render()});
   $$('[data-sub]').forEach(b=>b.onclick=()=>{TAB=b.dataset.sub;if(STUDY_SUB.includes(TAB))S.lastStudy=TAB;else if(EXAM_SUB.includes(TAB))S.lastExam=TAB;save();BR.pick=null;if(TIP)TIP.style.display='none';render()});
   window.scrollTo(0,0);
 }
-function full(inner){ensureSky();$('#app').innerHTML=`<div class="sess">${inner}</div>`}
+let LASTPAGE='';
+function full(inner){LASTPAGE='';ensureSky();document.body.classList.add('studying');$('#app').innerHTML=`<div class="sess">${inner}</div>`}
 function greet(){const h=new Date().getHours();return L(h<11?'Chào buổi sáng':h<18?'Chào buổi chiều':'Chào buổi tối',h<11?'Good morning':h<18?'Good afternoon':'Good evening')+L(', anh Nhân',', Nhân')}
 const STUDY_SUB=['home','browse','stats'],EXAM_SUB=['exam','examstats'];
 function mainTab(){return STUDY_SUB.includes(TAB)?'home':EXAM_SUB.includes(TAB)?'exam':'sys'}
@@ -145,11 +181,19 @@ function sys(){
     <div class="seg">${[['vi','Tiếng Việt'],['en','English']].map(([k,l])=>`<button data-l="${k}" class="${S.lang===k?'on':''}">${l}</button>`).join('')}</div>
     <div class="ot">${L('Giao diện','Appearance')}</div>
     <div class="seg" id="smode">${[['auto',L('Theo giờ','By time')],['day',L('Ban ngày','Day')],['night',L('Ban đêm','Night')]].map(([k,l])=>`<button data-m="${k}" class="${S.mode===k?'on':''}">${l}</button>`).join('')}</div>
-    <div class="tiny" style="margin-top:6px">${L('Theo giờ: trời sao từ 18:00 đến 6:00.','By time: starry night from 18:00 to 6:00.')}</div></div>
+    <div class="tiny" style="margin-top:6px">${L('Theo giờ: ban đêm từ 18:00 đến 6:00.','By time: starry night from 18:00 to 6:00.')}</div></div>
+   <div class="card"><div class="ot">${L('Bầu trời','Sky')}</div>
+    <div class="seg">${[[1,L('Mây nghiêng theo máy','Tilt with phone')],[0,L('Mây đứng yên','Still')]].map(([k,l])=>`<button data-tl="${k}" class="${(S.tilt===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="tiny" style="margin-top:6px">${L('Màu trời ban ngày đổi theo giờ: sáng hồng, trưa xanh, chiều cam. Ban đêm là dải ngân hà.','Daytime sky changes with the hour. Night shows the Milky Way.')}${SKYFX.needsAsk()?L(' iPhone sẽ hỏi quyền dùng cảm biến chuyển động một lần.',' iPhone asks for motion access once.'):''}</div></div>
    <div class="card"><div class="ot">${L('Nhạc nền','Background music')}</div>
     <div class="row"><div class="seg grow">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-mu="${k}" class="${(MUSIC.on?1:0)===k?'on':''}">${l}</button>`).join('')}</div></div>
     <div class="row" style="margin-top:12px"><span class="tiny">${L('Âm lượng','Volume')}</span><input type="range" id="smv" class="grow" min="0" max="100" value="${Math.round((S.vol??0.5)*100)}" style="accent-color:var(--bee-deep)"></div>
-    <div class="tiny" style="margin-top:8px">${L('Nhạc piano nhẹ do app tự soạn, không lặp lại. Bật tắt nhanh bằng nút nốt nhạc khi học.','Soft generative piano, never repeats. Toggle with the note button while studying.')}</div></div>
+    <div class="tiny" style="margin-top:8px">${L('Nhạc do app tự soạn, không lặp lại. Ban ngày sáng và nhịp vừa, ban đêm chậm và mơ màng hơn. Bật tắt nhanh bằng nút nốt nhạc khi học.','Generative music that never repeats: brighter by day, slower and dreamier at night. Toggle with the note button while studying.')}</div></div>
+   <div class="card"><div class="ot">${L('Hiệu ứng âm thanh','Sound effects')}</div>
+    <div class="seg">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-sf="${k}" class="${(S.sfx===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="row" style="margin-top:12px"><span class="tiny">${L('Âm lượng','Volume')}</span><input type="range" id="sfv" class="grow" min="0" max="100" value="${Math.round((S.sfxv??0.6)*100)}" style="accent-color:var(--bee-deep)"></div>
+    <div class="row wrapbtn" style="margin-top:10px">${[['ok',L('Nhớ','Remembered')],['ng',L('Quên','Forgot')],['flip',L('Lật thẻ','Flip')],['woof',L('Chó ong','Shiratama')]].map(([k,l])=>`<button class="btn line sm" data-try="${k}">▶ ${l}</button>`).join('')}</div>
+    <div class="tiny" style="margin-top:8px">${L('Nếu iPhone đang gạt im lặng thì sẽ không nghe tiếng.','No sound when the iPhone silent switch is on.')}</div></div>
    <div class="card"><div class="ot">${L('Cỡ chữ trên thẻ và câu hỏi','Text size on cards and questions')}</div>
     <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
     <div class="tiny" style="margin-top:8px">${L('Khi đang học có nút A− / A+ ở thanh trên.','While studying use A− / A+ in the top bar.')}</div></div>
@@ -160,6 +204,10 @@ function sys(){
   </div>`);
     $$('[data-l]').forEach(b=>b.onclick=()=>{S.lang=b.dataset.l;save();applyLook();draw()});
     $$('[data-mu]').forEach(b=>b.onclick=()=>{MUSIC.set(b.dataset.mu==='1');draw()});
+    $$('[data-sf]').forEach(b=>b.onclick=()=>{SFX.set(b.dataset.sf==='1');draw()});
+    $('#sfv').oninput=e=>{S.sfxv=+e.target.value/100;save()};$('#sfv').onchange=()=>SFX.play('ok');
+    $$('[data-try]').forEach(b=>b.onclick=()=>SFX.play(b.dataset.try));
+    $$('[data-tl]').forEach(b=>b.onclick=async()=>{if(b.dataset.tl==='1'){const ok=await SKYFX.askTilt();if(!ok)toast(L('iPhone chưa cho phép cảm biến chuyển động','Motion access was not allowed'))}else{S.tilt=0;save();document.documentElement.style.setProperty('--px',0);document.documentElement.style.setProperty('--py',0)}draw()});
     $('#smv').oninput=e=>{S.vol=+e.target.value/100;save();MUSIC.vol()};
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
     $('#sm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook();draw()};
@@ -394,7 +442,7 @@ async function ankiBox(){
    ${st.cards.length?`<div class="deckhead"><span class="grow">Deck</span><span class="dc new">${L('Mới','New')}</span><span class="dc lrn">${L('Học','Learn')}</span><span class="dc due">${L('Ôn','Due')}</span><span style="width:34px"></span></div>
    <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}</div>`;
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
-  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
+  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
   $$('[data-tw]').forEach(b=>b.onclick=()=>{S.collapsed=S.collapsed||{};S.collapsed[b.dataset.tw]=!S.collapsed[b.dataset.tw];save();ankiBox()});
   $$('[data-study]').forEach(b=>b.onclick=()=>startAnki(nodeSet(st,tree,b.dataset.study),b.dataset.study));
@@ -664,6 +712,13 @@ async function editCard(c,st,done,quiet){
   $('#eforget').onclick=()=>{if(confirm(L('Đưa thẻ này về thẻ mới?','Reset this card to new?')))upd({card:emptyCard(),appAt:Date.now()})};
   $('#edel').onclick=async()=>{if(!confirm(L('Xóa thẻ này?','Delete this card?')))return;await ANKI.del('cards',c.id);BR.sel=null;document.body.classList.remove('editing');toast(L('Đã xóa','Deleted'));done()};
 }
+function glow(stage,ok){if(!stage)return;const d=document.createElement('div');d.className='glow '+(ok?'ok':'ng');stage.appendChild(d);setTimeout(()=>d.remove(),700)}
+// chó ong thỉnh thoảng bay ngang màn hình (không bay khi đang học hay làm đề)
+const FLYBY=(()=>{let t=null;
+  function go(){if(!document.hidden&&!AK&&!SS&&DATA&&!document.querySelector('.veil')&&!document.getElementById('intro')){
+      const d=document.createElement('div');d.className='flyby'+(Math.random()<.5?' rtl':'');d.style.setProperty('--y',(12+Math.random()*55)+'vh');d.innerHTML=dog('fb');document.body.appendChild(d);setTimeout(()=>SFX.play('buzz'),1800);setTimeout(()=>d.remove(),9000)}
+    t=setTimeout(go,(70+Math.random()*110)*1000)}
+  return {start(){if(!t)t=setTimeout(go,25000)}}})();
 // sửa thẻ ngay trong lúc học, xong quay lại đúng thẻ đó
 function quickEdit(it){
   const [f,b]=fieldsOf(it);const v=document.createElement('div');v.className='veil';
@@ -724,7 +779,7 @@ function schedule(card,g,P){
 const revType=s=>s===2?1:s===3?2:0;
 function renderAnki(){
   const it=AK.list[AK.i];
-  if(!it){dropState();const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('fly big')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};return}
+  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('fly big')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};return}
   const deck=AK.decks.find(d=>d.id===it.deck);const P=presetOf(deck);
   const left=AK.list.length-AK.i;
   const cnt={n:0,l:0,r:0};AK.list.slice(AK.i).forEach(c=>{const s=c.card.state;if(s===0)cnt.n++;else if(s===2)cnt.r++;else cnt.l++});
@@ -736,15 +791,15 @@ function renderAnki(){
   ANKI.hydrate($('#fc'));
   const shown0=Date.now();clearInterval(AK.tmr);if(P.showTimer)AK.tmr=setInterval(()=>{const e=$('#aktm');if(!e)return clearInterval(AK.tmr);e.textContent=fmtTime(Math.min(P.capSec,(Date.now()-shown0)/1000))},1000);
   $('#akq').onclick=()=>{clearInterval(AK.tmr);AK=null;dropState();TAB='home';render()};
-  $('#akundo').onclick=undoAnki;
+  $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};
   $('#aksm').onclick=e=>{e.stopPropagation();S.size=Math.max(0,S.size-1);save();applyLook()};
   $('#aksp').onclick=e=>{e.stopPropagation();S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()};
   $('#akmu').onclick=e=>{MUSIC.toggle();e.currentTarget.classList.toggle('on',MUSIC.on)};
   $('#akedit').onclick=e=>{e.stopPropagation();quickEdit(it)};
   const fc=$('#fc'),stage=$('#stage');
   let busy=false;
-  const flip=()=>{AK.show=true;dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akhint').innerHTML=L('Chạm nửa phải hoặc vuốt phải = Nhớ · nửa trái hoặc vuốt trái = Quên','Right half or swipe right = Remembered · left half or swipe left = Forgot')+`<span class="desk"> · ${L('phím 1 = Quên, phím 2 hoặc cách = Nhớ','key 1 = Forgot, 2 or space = Remembered')}</span>`};
-  const grade=async(g)=>{if(busy)return;busy=true;clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
+  const flip=()=>{AK.show=true;SFX.play('flip');dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akhint').innerHTML=L('Chạm nửa phải hoặc vuốt phải = Nhớ · nửa trái hoặc vuốt trái = Quên','Right half or swipe right = Remembered · left half or swipe left = Forgot')+`<span class="desk"> · ${L('phím 1 = Quên, phím 2 hoặc cách = Nhớ','key 1 = Forgot, 2 or space = Remembered')}</span>`};
+  const grade=async(g)=>{if(busy)return;busy=true;glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
     const prev=JSON.parse(JSON.stringify(it));const pos=AK.i;const was=it.card.state;const ms=Math.min(P.capSec*1000,Date.now()-shown0);
     const D=daily();const dsnap=JSON.parse(JSON.stringify(D));
     if(hasF)it.card=schedule(it.card,g,P);
@@ -770,7 +825,7 @@ function renderAnki(){
   let sx=0,sy=0,dx=0,drag=false,moved=false;
   fc.addEventListener('pointerdown',e=>{if(e.target.closest('a,button,input,textarea,select'))return;sx=e.clientX;sy=e.clientY;dx=0;drag=true;moved=false;fc.style.transition='none'});
   fc.addEventListener('pointermove',e=>{if(!drag||!AK.show)return;dx=e.clientX-sx;if(Math.abs(dx)>8&&Math.abs(dx)>Math.abs(e.clientY-sy))moved=true;
-    if(moved){fc.style.transform=`translateX(${dx}px) rotate(${dx/22}deg) rotateY(180deg)`;fc.classList.toggle('tint-r',dx>40);fc.classList.toggle('tint-l',dx<-40)}});
+    if(moved){const dy=e.clientY-sy;const rx=Math.max(-14,Math.min(14,-dy/10)),ry=Math.max(-22,Math.min(22,dx/9));fc.style.transform=`translateX(${dx}px) rotate(${dx/26}deg) rotateY(${180+ry}deg) rotateX(${rx}deg)`;fc.style.setProperty('--shx',(50-dx/4)+'%');fc.classList.toggle('tint-r',dx>40);fc.classList.toggle('tint-l',dx<-40)}});
   const end=e=>{if(!drag)return;drag=false;fc.style.transition='';fc.classList.remove('tint-r','tint-l');
     if(!AK.show){if(Math.abs(e.clientX-sx)<12&&Math.abs(e.clientY-sy)<12)flip();return}
     if(moved){if(dx>70)return grade(3);if(dx<-70)return grade(1);fc.style.transform='';return}
@@ -944,37 +999,75 @@ function examStats(){
 
 /* ---------- nhạc nền (tự sinh bằng Web Audio, không dùng file nhạc) ---------- */
 const MUSIC=(()=>{
-  let ctx=null,master=null,timer=null,step=0,nextT=0;
-  const scale=[0,2,4,7,9,12,14,16,19,21];
-  const chords=[[48,55,59,64],[45,52,55,60],[41,48,52,57],[43,50,55,59]]; // Cmaj7 Am7 Fmaj7 G
+  // Hai bản nhạc tự sinh: ban ngày sáng, nhịp vừa, piano + đàn tre; ban đêm chậm, trầm, mơ màng, nhiều vang.
+  let ctx=null,master=null,dry=null,wet=null,timer=null,step=0,nextT=0,cur=null;
   const hz=m=>440*Math.pow(2,(m-69)/12);
-  function verb(){const len=ctx.sampleRate*3.2,b=ctx.createBuffer(2,len,ctx.sampleRate);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3)}const v=ctx.createConvolver();v.buffer=b;return v}
+  const SONG={
+    day:{beat:.55,chords:[[48,55,59,64],[45,52,55,60],[41,48,52,57],[43,50,55,62]],scale:[0,2,4,7,9,12,14,16,19,21,24],pluckP:[.75,.45],reg:24,wet:.35,cut:3400,padG:.03},
+    night:{beat:.95,chords:[[50,57,61,64,66],[47,54,57,61],[43,50,54,57,61],[45,52,56,59]],scale:[0,2,4,6,7,9,11,12,14,16,18],pluckP:[.45,.2],reg:12,wet:.6,cut:1800,padG:.038}};
+  function verb(sec){const len=ctx.sampleRate*sec,b=ctx.createBuffer(2,len,ctx.sampleRate);for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6)}const v=ctx.createConvolver();v.buffer=b;return v}
+  let lp=null;
   function init(){ctx=new (window.AudioContext||window.webkitAudioContext)();master=ctx.createGain();master.gain.value=0;
-    const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=2600;const rv=verb();const wet=ctx.createGain();wet.gain.value=.45;
+    lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=3000;const rv=verb(4);wet=ctx.createGain();wet.gain.value=.4;
     master.connect(lp);lp.connect(ctx.destination);lp.connect(rv);rv.connect(wet);wet.connect(ctx.destination)}
-  function pad(m,t,dur){[0,7].forEach(det=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=hz(m);o.detune.value=det-3;
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+2.5);g.gain.linearRampToValueAtTime(.03,t+dur-2);g.gain.linearRampToValueAtTime(0,t+dur+.5);o.connect(g);g.connect(master);o.start(t);o.stop(t+dur+.6)})}
-  function pluck(m,t,v){const o=ctx.createOscillator(),o2=ctx.createOscillator(),g=ctx.createGain();o.type='triangle';o2.type='sine';o.frequency.value=hz(m);o2.frequency.value=hz(m+12);
-    g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(v,t+.01);g.gain.exponentialRampToValueAtTime(.0008,t+2.4);
-    const g2=ctx.createGain();g2.gain.value=.25;o.connect(g);o2.connect(g2);g2.connect(g);g.connect(master);o.start(t);o2.start(t);o.stop(t+2.5);o2.stop(t+2.5)}
-  function tick(){const beat=.75;while(nextT<ctx.currentTime+1.5){const bar=Math.floor(step/8)%chords.length;
-      if(step%8===0)chords[bar].forEach(m=>pad(m,nextT,beat*8));
-      if(Math.random()<(step%2?0.35:0.6)){const base=chords[bar][0]+24;const n=base-12+scale[Math.floor(Math.random()*scale.length)];pluck(n,nextT+(Math.random()*.04),.06+Math.random()*.05)}
-      if(step%8===4&&Math.random()<.5)pluck(chords[bar][0]+12,nextT,.05);
-      nextT+=beat;step++}}
+  // pad liền mạch: mỗi hợp âm vào sớm và tắt muộn để chồng lên nhau, không có khoảng lặng
+  function pad(m,t,dur,g){[-4,4].forEach(det=>{const o=ctx.createOscillator(),a=ctx.createGain();o.type='sine';o.frequency.value=hz(m);o.detune.value=det;
+    a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g,t+1.6);a.gain.setValueAtTime(g,t+dur);a.gain.linearRampToValueAtTime(0,t+dur+2.4);o.connect(a);a.connect(master);o.start(t);o.stop(t+dur+2.5)})}
+  function pluck(m,t,v,soft){const o=ctx.createOscillator(),o2=ctx.createOscillator(),a=ctx.createGain(),a2=ctx.createGain();o.type=soft?'sine':'triangle';o2.type='sine';o.frequency.value=hz(m);o2.frequency.value=hz(m+12);
+    a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(v,t+.012);a.gain.exponentialRampToValueAtTime(.0006,t+(soft?3.4:2.2));a2.gain.value=soft?.12:.28;
+    o.connect(a);o2.connect(a2);a2.connect(a);a.connect(master);o.start(t);o2.start(t);o.stop(t+3.5);o2.stop(t+3.5)}
+  function mode(){return isNight()?'night':'day'}
+  function tick(){
+    while(nextT<ctx.currentTime+2){
+      const m=mode();if(m!==cur&&step%8===0){cur=m;const X=SONG[m];wet.gain.setTargetAtTime(X.wet,ctx.currentTime,1.5);lp.frequency.setTargetAtTime(X.cut,ctx.currentTime,1.5)}
+      const X=SONG[cur||m];const bar=Math.floor(step/8)%X.chords.length;const ch=X.chords[bar];
+      if(step%8===0)ch.forEach(n=>pad(n,nextT,X.beat*8,X.padG));
+      if(Math.random()<X.pluckP[step%2]){const n=ch[0]+X.reg+X.scale[Math.floor(Math.random()*X.scale.length)]-12;pluck(n,nextT+Math.random()*.03,(cur==='night'?.05:.07)+Math.random()*.04,cur==='night')}
+      if(step%8===0)pluck(ch[0]+12,nextT,.05,cur==='night');
+      if(cur==='night'&&step%16===12&&Math.random()<.6)pluck(ch[ch.length-1]+24,nextT,.03,true); // tiếng chuông xa
+      nextT+=X.beat;step++}}
+  function alive(){if(!ctx)return;if(ctx.state!=='running')ctx.resume().catch(()=>{});if(!timer){nextT=Math.max(nextT,ctx.currentTime+.1);timer=setInterval(tick,250);tick()}}
   const api={on:false,
-    start(){if(!ctx)init();ctx.resume();if(timer)return;nextT=ctx.currentTime+.1;timer=setInterval(tick,300);tick();api.vol()},
-    stop(){if(!ctx)return;master.gain.setTargetAtTime(0,ctx.currentTime,.4);const c=ctx;setTimeout(()=>{if(!api.on){clearInterval(timer);timer=null;c.suspend()}},1500)},
-    vol(){if(ctx&&api.on)master.gain.setTargetAtTime((S.vol??0.5)*0.9,ctx.currentTime,.5)},
+    start(){if(!ctx)init();alive();api.vol()},
+    stop(){if(!ctx)return;master.gain.setTargetAtTime(0,ctx.currentTime,.4);setTimeout(()=>{if(!api.on){clearInterval(timer);timer=null;ctx.suspend()}},1500)},
+    vol(){if(ctx&&api.on)master.gain.setTargetAtTime((S.vol??0.5)*0.9,ctx.currentTime,.6)},
     set(v){api.on=v;S.music=v?1:0;save();v?api.start():api.stop()},
     toggle(){api.set(!api.on)}};
   api.on=!!S.music;
-  // trình duyệt chỉ cho phát âm thanh sau lần chạm đầu tiên
-  const kick=()=>{if(api.on)api.start();document.removeEventListener('pointerdown',kick);document.removeEventListener('keydown',kick)};
-  document.addEventListener('pointerdown',kick);document.addEventListener('keydown',kick);
-  document.addEventListener('visibilitychange',()=>{if(!ctx||!api.on)return;document.hidden?ctx.suspend():ctx.resume()});
+  // iPhone hay tạm dừng âm thanh (khóa máy, chuyển app, có cuộc gọi): mỗi lần chạm lại thì bật lại nhạc
+  document.addEventListener('pointerdown',()=>{if(api.on)api.start()},{passive:true});
+  document.addEventListener('keydown',()=>{if(api.on)api.start()});
+  document.addEventListener('visibilitychange',()=>{if(!ctx||!api.on)return;if(document.hidden){ctx.suspend();clearInterval(timer);timer=null}else api.start()});
+  window.addEventListener('pageshow',()=>{if(api.on&&ctx)api.start()});
   return api;
 })();
+/* ---------- hiệu ứng âm thanh (tự sinh, không dùng file) ---------- */
+const SFX=(()=>{
+  let ctx=null,out=null;
+  const on=()=>S.sfx!==0;
+  function init(){if(ctx)return;ctx=new (window.AudioContext||window.webkitAudioContext)();out=ctx.createGain();out.connect(ctx.destination)}
+  function vol(){return (S.sfxv??0.6)*0.9}
+  function tone(f,t,dur,type,g,f2){const o=ctx.createOscillator(),a=ctx.createGain();o.type=type||'sine';o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+dur);
+    a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g*vol(),t+.008);a.gain.exponentialRampToValueAtTime(.0001,t+dur);o.connect(a);a.connect(out);o.start(t);o.stop(t+dur+.02)}
+  function noise(t,dur,g,from,to){const n=ctx.sampleRate*dur,b=ctx.createBuffer(1,n,ctx.sampleRate),d=b.getChannelData(0);for(let i=0;i<n;i++)d[i]=Math.random()*2-1;
+    const src=ctx.createBufferSource();src.buffer=b;const f=ctx.createBiquadFilter();f.type='bandpass';f.Q.value=1.2;f.frequency.setValueAtTime(from,t);f.frequency.exponentialRampToValueAtTime(to,t+dur);
+    const a=ctx.createGain();a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(g*vol(),t+dur*.3);a.gain.exponentialRampToValueAtTime(.0001,t+dur);src.connect(f);f.connect(a);a.connect(out);src.start(t);src.stop(t+dur)}
+  const P={
+    flip(t){noise(t,.22,.5,900,3200)},                       // lật thẻ: tiếng giấy lướt
+    ok(t){tone(880,t,.35,'sine',.22);tone(1318.5,t+.07,.5,'sine',.2);tone(2637,t+.07,.25,'sine',.04)},  // Nhớ: chuông hai nốt đi lên
+    ng(t){tone(392,t,.28,'triangle',.2,330);tone(294,t+.09,.35,'sine',.14)},                           // Quên: hai nốt trầm đi xuống, nhẹ
+    tap(t){tone(1500,t,.05,'sine',.12)},                     // chạm nút
+    tab(t){tone(660,t,.09,'sine',.14,990)},                  // đổi tab: "pop"
+    undo(t){tone(990,t,.12,'sine',.14,520)},
+    buzz(t){const o=ctx.createOscillator(),l=ctx.createOscillator(),lg=ctx.createGain(),a=ctx.createGain();o.type='sawtooth';o.frequency.value=230;l.frequency.value=38;lg.gain.value=40;l.connect(lg);lg.connect(o.frequency);
+      const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(.08*vol(),t+.05);a.gain.linearRampToValueAtTime(.0001,t+.5);o.connect(f);f.connect(a);a.connect(out);o.start(t);l.start(t);o.stop(t+.52);l.stop(t+.52)}, // chó ong vo ve
+    woof(t){tone(620,t,.12,'triangle',.22,420);tone(700,t+.16,.14,'triangle',.18,460)},  // "gâu gâu" nhỏ
+    done(t){[523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,t+i*.09,.6,'sine',.16))},
+    open(t){tone(523.25,t,.25,'sine',.12);tone(783.99,t+.1,.4,'sine',.12)}};
+  return {play(k){if(!on())return;try{init();if(ctx.state==='suspended')ctx.resume();P[k](ctx.currentTime+.01)}catch(e){}},set(v){S.sfx=v?1:0;save()},get on(){return on()}};
+})();
+// tiếng chạm cho mọi nút
+document.addEventListener('pointerdown',e=>{const b=e.target.closest('button,.dn');if(!b||b.id==='fc'||b.closest('#fc'))return;if(b.matches('[data-tab],[data-sub]'))SFX.play('tab');else SFX.play('tap')},{passive:true});
 /* ---------- bộ thẻ dựng sẵn ---------- */
 async function openBundle(code){
   if(!window.ANKI)return;
@@ -987,7 +1080,7 @@ async function openBundle(code){
   const c=ls.get('shiratama-code',null);
   if(c){try{DATA=await loadContent(c);indexData()}catch(e){DATA=null}}
   if(DATA)await openBundle(c);
-  render();
+  render();FLYBY.start();
   const it=document.getElementById('intro');if(it){const wait=Math.max(0,1800-(Date.now()-(window.T0||0)));setTimeout(()=>{it.classList.add('out');setTimeout(()=>it.remove(),700)},wait)}
 })();
 })();

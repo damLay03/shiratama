@@ -454,3 +454,100 @@ body.editing .bedit{display:block}
 .fc .back .ans{text-align:center}
 .preview .ans{text-align:center}
 .fc .face>.fin{margin:auto 0;width:100%}
+
+/* =================== v7: bầu trời động =================== */
+:root{--day1:#cfe6f8;--day2:#eef6fd;--px:0;--py:0}
+.sky{background:none}
+.sky>i,.sky>svg{display:none}
+.sky-grad{position:absolute;inset:0;background:linear-gradient(180deg,var(--day1),var(--day2) 75%);transition:opacity 1.2s}
+.sun{position:absolute;left:var(--sunx,70%);top:var(--suny,10%);width:70vmax;height:70vmax;margin:-35vmax 0 0 -35vmax;border-radius:50%;background:radial-gradient(circle,rgba(255,250,225,.85),rgba(255,240,200,.35) 22%,rgba(255,255,255,0) 55%);animation:sunb 9s ease-in-out infinite alternate;pointer-events:none}
+@keyframes sunb{from{transform:scale(.94);opacity:.8}to{transform:scale(1.06);opacity:1}}
+.sky-l{position:absolute;inset:-6%;transform:translate3d(calc(var(--px)*var(--k)*1px),calc(var(--py)*var(--k)*1px),0);will-change:transform}
+.l1{--k:10}.l2{--k:24}.l3{--k:44}
+.cloud{position:absolute;left:0;width:var(--w);height:calc(var(--w)*.42);animation:drift2 var(--dur) linear infinite;will-change:transform}
+.cloud i{position:absolute;border-radius:50%;background:rgba(255,255,255,.92);filter:blur(10px)}
+.cloud i:nth-child(1){width:46%;height:70%;left:8%;top:28%}
+.cloud i:nth-child(2){width:42%;height:95%;left:30%;top:0}
+.cloud i:nth-child(3){width:40%;height:72%;left:56%;top:22%}
+.cloud i:nth-child(4){width:92%;height:40%;left:4%;top:58%}
+.l3 .cloud i{filter:blur(22px);background:rgba(255,255,255,.7)}
+.l1 .cloud i{filter:blur(14px);background:rgba(255,255,255,.75)}
+@keyframes drift2{from{transform:translateX(-40vw)}to{transform:translateX(120vw)}}
+/* đêm: ngân hà, tinh vân */
+.night{position:absolute;inset:0;opacity:0;transition:opacity 1.2s;background:radial-gradient(120% 80% at 50% 0%,#232c66,#141a3e 55%,#0c1030);transform:translate3d(calc(var(--px)*-8px),calc(var(--py)*-8px),0)}
+:root[data-mode="night"] .night{opacity:1}
+:root[data-mode="night"] .sky-l,:root[data-mode="night"] .sun{opacity:0}
+.sky-l,.sun{transition:opacity 1.2s}
+.neb{position:absolute;border-radius:50%;filter:blur(50px);mix-blend-mode:screen;animation:neb 40s ease-in-out infinite alternate}
+.n1{width:90vw;height:60vw;left:-20vw;top:8vh;background:radial-gradient(circle,rgba(130,90,230,.55),rgba(130,90,230,0) 70%)}
+.n2{width:80vw;height:70vw;right:-25vw;top:38vh;background:radial-gradient(circle,rgba(220,90,170,.38),rgba(220,90,170,0) 70%);animation-duration:55s}
+.n3{width:100vw;height:60vw;left:0;bottom:-10vh;background:radial-gradient(circle,rgba(70,130,240,.42),rgba(70,130,240,0) 70%);animation-duration:47s}
+@keyframes neb{from{transform:translate(0,0) scale(1) rotate(0)}to{transform:translate(6vw,-4vh) scale(1.15) rotate(12deg)}}
+.milky{position:absolute;left:-30%;top:30%;width:160%;height:26vh;transform:rotate(-28deg);background:linear-gradient(180deg,rgba(255,255,255,0),rgba(210,215,255,.16) 40%,rgba(255,235,250,.22) 50%,rgba(210,215,255,.16) 60%,rgba(255,255,255,0));filter:blur(14px)}
+.stars{position:absolute;inset:0}
+.stars circle{fill:#fff}
+.tw{animation:twk 3s ease-in-out infinite alternate}
+.t1{animation-duration:2.2s;animation-delay:-1s}.t2{animation-duration:4.1s;animation-delay:-2s}.t3{animation-duration:5.3s;animation-delay:-.5s;fill:#ffe9a8!important}
+@keyframes twk{from{opacity:.25}to{opacity:1}}
+#shoot i{position:absolute;width:140px;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(255,255,255,0),#fff);transform:rotate(-30deg);animation:shoot 1.4s ease-out forwards;filter:drop-shadow(0 0 6px #fff)}
+@keyframes shoot{from{opacity:0;transform:rotate(-30deg) translateX(0)}15%{opacity:1}to{opacity:0;transform:rotate(-30deg) translateX(-60vw)}}
+/* lúc học: nền dịu lại để tập trung */
+body.studying .sky-l,body.studying .neb{animation-play-state:paused}
+body.studying .cloud{animation-duration:calc(var(--dur)*2)}
+@media (prefers-reduced-motion:reduce){.cloud,.neb,.tw,.sun{animation:none!important}}
+/* sống động: nền vẫn chạy khi học */
+body.studying .sky-l,body.studying .neb{animation-play-state:running}
+body.studying .cloud{animation-duration:var(--dur)}
+
+/* chuyển trang: các khối nổi lên lần lượt */
+@keyframes rise{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+.wrap.enter>*,.wrap.enter .homegrid>*,.wrap.enter .hcol>*,.wrap.enter .tools>*,.wrap.enter .stgrid>*,.wrap.enter .sysgrid>*,.wrap.enter #stbody>*,.wrap.enter .subnav>*{animation:rise .5s cubic-bezier(.2,.9,.25,1.1) backwards}
+.wrap.enter>*:nth-child(2),.wrap.enter .hcol>*:nth-child(2),.wrap.enter .sysgrid>*:nth-child(2),.wrap.enter .stgrid>*:nth-child(2),.wrap.enter .subnav>*:nth-child(2),.wrap.enter .tools>*:nth-child(2){animation-delay:.05s}
+.wrap.enter>*:nth-child(3),.wrap.enter .homegrid>*:nth-child(2),.wrap.enter .sysgrid>*:nth-child(3),.wrap.enter .subnav>*:nth-child(3),.wrap.enter .tools>*:nth-child(3){animation-delay:.1s}
+.wrap.enter>*:nth-child(4),.wrap.enter .sysgrid>*:nth-child(4),.wrap.enter .tools>*:nth-child(4){animation-delay:.15s}
+.wrap.enter>*:nth-child(n+5),.wrap.enter #stbody>*:nth-child(n+3){animation-delay:.2s}
+.sess{animation:rise .45s cubic-bezier(.2,.9,.25,1.1) backwards}
+
+/* kính mờ đậm hơn */
+.card,.tool,.subnav button,.tabs{backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+:root:not([data-mode="night"]) .card,:root:not([data-mode="night"]) .tool{background:rgba(255,255,255,.78);box-shadow:inset 0 1px 0 rgba(255,255,255,.9),var(--shadow)}
+:root[data-mode="night"] .card,:root[data-mode="night"] .tool,:root[data-mode="night"] .tabs{background:rgba(28,34,80,.72);box-shadow:inset 0 1px 0 rgba(255,255,255,.08),var(--shadow)}
+
+/* nút nảy khi chạm */
+.btn,.tool,.iconbtn,.subnav button,.tabs button,.seg button,.deckrow .dn{transition:transform .25s cubic-bezier(.3,1.8,.5,1),background .2s,box-shadow .2s}
+.btn:active,.tool:active,.iconbtn:active,.subnav button:active,.tabs button:active,.seg button:active{transform:scale(.93)}
+.btn.bee{background:linear-gradient(180deg,#ffd84d,var(--bee));position:relative;overflow:hidden}
+.btn.bee::after{content:"";position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.55) 45%,transparent 60%);transform:translateX(-120%);animation:sheen 4.5s ease-in-out infinite}
+@keyframes sheen{0%,70%{transform:translateX(-120%)}100%{transform:translateX(120%)}}
+.hero-n{background:linear-gradient(90deg,var(--ink),var(--s1) 120%);-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* thẻ bóng, nghiêng 3D */
+.stage{perspective:1100px}
+.fc .face{box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 30px 60px -28px rgba(30,60,110,.55),0 8px 20px -10px rgba(30,60,110,.25)}
+:root[data-mode="night"] .fc .face{box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 30px 60px -24px rgba(0,0,0,.8)}
+.fc .face::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;background:linear-gradient(115deg,transparent calc(var(--shx,50%) - 30%),rgba(255,255,255,.38) var(--shx,50%),transparent calc(var(--shx,50%) + 30%));opacity:.0;transition:opacity .3s;mix-blend-mode:soft-light}
+.fc[style*="--shx"] .face::after{opacity:1}
+.fc{--shx:50%}
+.fc.flip .front{pointer-events:none}
+@keyframes cardIn{from{opacity:0;transform:translateY(26px) scale(.94) rotateX(10deg)}to{opacity:1;transform:none}}
+.stage .fc:not(.flip):not(.fly-r):not(.fly-l){animation:cardIn .42s cubic-bezier(.2,.9,.25,1.15) backwards}
+
+/* gợn sáng khi chấm */
+.glow{position:absolute;inset:0;border-radius:26px;pointer-events:none;z-index:5;animation:glow .65s ease-out forwards}
+.glow.ok{background:radial-gradient(circle at 75% 50%,rgba(60,200,120,.55),rgba(60,200,120,0) 60%);box-shadow:0 0 0 3px rgba(60,200,120,.6),0 0 50px rgba(60,200,120,.5)}
+.glow.ng{background:radial-gradient(circle at 25% 50%,rgba(240,100,130,.5),rgba(240,100,130,0) 60%);box-shadow:0 0 0 3px rgba(240,100,130,.55),0 0 50px rgba(240,100,130,.45)}
+@keyframes glow{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(1.06)}}
+
+/* chó ong bay ngang */
+.flyby{position:fixed;left:0;top:var(--y);z-index:35;pointer-events:none;animation:flyby 8.5s cubic-bezier(.45,.05,.55,.95) forwards}
+.flyby.rtl{animation-name:flybyR}
+.flyby .dog{--dw:70px;animation:bob .9s ease-in-out infinite}
+.flyby .dog .wl,.flyby .dog .wr{animation-duration:.09s}
+.flyby.rtl .dog{transform:scaleX(-1)}
+@keyframes flyby{0%{transform:translate(-120px,0) rotate(8deg)}25%{transform:translate(28vw,-6vh) rotate(-4deg)}50%{transform:translate(52vw,4vh) rotate(6deg)}75%{transform:translate(78vw,-8vh) rotate(-6deg)}100%{transform:translate(calc(100vw + 120px),-2vh) rotate(10deg)}}
+@keyframes flybyR{0%{transform:translate(calc(100vw + 120px),0) rotate(-8deg)}30%{transform:translate(65vw,-7vh) rotate(4deg)}60%{transform:translate(35vw,5vh) rotate(-6deg)}100%{transform:translate(-140px,-4vh) rotate(-10deg)}}
+.hero .dog{z-index:4}
+.hero .bubble{right:calc(100% - 4px);top:-4px;border-radius:16px 16px 4px 16px;transform-origin:bottom right;max-width:180px}
+:root[data-mode="night"] .btn.bee{background:linear-gradient(180deg,#ffd84d,var(--bee));color:var(--bee-ink)}
+.n1{background:radial-gradient(circle,rgba(140,95,240,.7),rgba(140,95,240,0) 70%)}
+.n2{background:radial-gradient(circle,rgba(230,95,180,.5),rgba(230,95,180,0) 70%)}

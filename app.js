@@ -23,14 +23,16 @@ const secName=k=>LL(SECN[k]);
 const partName=p=>LL(PARTN[p.key])||p.name;
 const typeName=q=>LL(TYPEN[q.sec+q.m])||q.type;
 const examTitle=ex=>ex.vi?L(ex.vi,ex.en||ex.vi):L('Đề mẫu chính thức JLPT N3 (2018)','Official JLPT N3 sample test (2018)');
+const exShort=ex=>ex.short||L('Đề mẫu 2018','Sample 2018');
+const srcLabel=(q,ex)=>L('Đề ','Test ')+exShort(ex)+' · '+L('câu ','Q')+q.no;
 const examsSorted=()=>DATA.exams.slice().sort((a,b)=>(b.date||'0').localeCompare(a.date||'0'));
-const SIZES=[18,20,22,25,28,32,36];
+const SIZES=[14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,30,32,34,36,40,44,48],SIZES_OLD=[18,20,22,25,28,32,36];
 
 /* ---------- state ---------- */
 const KEY='shiratama-v1';
 const DEF={v:1,ans:{},cards:{},exams:{},theme:'auto',mode:'auto',size:2,lang:'vi'};
 let S=Object.assign(structuredClone(DEF),ls.get(KEY,{}));
-if(S.size==null||!S.size2){S.size=3;S.size2=1} if(!S.mode)S.mode='auto'; if(!S.lang)S.lang='vi';
+if(S.size==null||!S.size2){S.size=3;S.size2=1} if(!S.size3){const px=SIZES_OLD[S.size]||25;S.size=Math.max(0,SIZES.indexOf(px));S.size3=1} if(!S.mode)S.mode='auto'; if(!S.lang)S.lang='vi';
 const save=()=>ls.set(KEY,S);
 let DATA=null, QI={}, SS=null, AK=null, TAB='home';
 
@@ -93,6 +95,7 @@ const I={
   plus:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   folder:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
   upload:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>',
+  shuffle:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>',
   ok:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>'
 };
 
@@ -214,8 +217,9 @@ function sys(){
     <div class="row wrapbtn" style="margin-top:10px">${[['ok',L('Nhớ','Remembered')],['ng',L('Quên','Forgot')],['flip',L('Lật thẻ','Flip')],['woof',L('Chó ong','Shiratama')]].map(([k,l])=>`<button class="btn line sm" data-try="${k}">▶ ${l}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:8px">${L('Nếu iPhone đang gạt im lặng thì sẽ không nghe tiếng.','No sound when the iPhone silent switch is on.')}</div></div>
    <div class="card"><div class="ot">${L('Cỡ chữ trên thẻ và câu hỏi','Text size on cards and questions')}</div>
-    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
-    <div class="tiny" style="margin-top:8px">${L('Khi đang học có nút A− / A+ ở thanh trên.','While studying use A− / A+ in the top bar.')}</div></div>
+    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><b class="tiny" style="min-width:38px;text-align:center">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
+    <input type="range" id="srng" min="0" max="${SIZES.length-1}" value="${S.size}" style="width:100%;margin-top:12px;accent-color:var(--bee-deep)">
+    <div class="tiny" style="margin-top:8px">${L(`${SIZES.length} nấc, từ ${SIZES[0]}px đến ${SIZES[SIZES.length-1]}px. Khi đang học có nút A− / A+ trong nút ⋯.`,`${SIZES.length} steps. While studying use A− / A+ in the ⋯ menu.`)}</div></div>
    <div class="card"><div class="ot">${L('Dữ liệu','Data')}</div>
     <div class="kv"><span>${L('Bộ thẻ Anki cập nhật','Anki collection updated')}</span><b>${ls.get('shiratama-colv')?new Date(ls.get('shiratama-colv')*1000).toLocaleDateString(L('vi-VN','en-GB')):'—'}</b></div>
     <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này, đồng thời được gửi lên kho chung. Điện thoại và máy tính nhập cùng mã sẽ thấy cùng tiến độ.','Progress is saved here and synced. Devices with the same code share progress.')}</div>
@@ -234,16 +238,150 @@ function sys(){
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
     $('#sm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook();draw()};
     $('#sp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook();draw()};
+    $('#srng').oninput=e=>{S.size=+e.target.value;save();applyLook();const c=e.target.closest('.card');c.querySelector('.jp').style.fontSize=SIZES[S.size]+'px';c.querySelector('b.tiny').textContent=SIZES[S.size]+'px'};
     $('#slock').onclick=()=>{if(!confirm(L('Khóa app? Lần sau phải nhập lại mã. Tiến độ học vẫn giữ nguyên.','Lock the app? You will need the code again. Progress is kept.')))return;localStorage.removeItem('shiratama-code');DATA=null;render()};
   };
   draw();
 }
+
+/* ---------- v46: deck tự lướt, thanh tự lướt, ngữ pháp bằng ảnh flashcard ---------- */
+const GRADE_OF={again:1,hard:2,good:3,easy:4};
+let FV=null;
+
+// deck nào đang ở chế độ tự lướt (deck con theo deck cha gần nhất có đặt chế độ)
+function modeOf(name,decks){const by={};decks.forEach(d=>by[d.name]=d);const p=name.split('::');
+  for(let i=p.length;i>0;i--){const d=by[p.slice(0,i).join('::')];if(d&&d.mode)return d.mode}return 'srs'}
+function flipIds(decks){const s=new Set();decks.forEach(d=>{if(modeOf(d.name,decks)==='flip')s.add(d.id)});return s}
+
+/* ---- thanh tự lướt (giống Anki) ---- */
+function autoBarHTML(on,q,a,act,o={}){
+  const st=(k,lab,v)=>`<div class="ab-s"><span>${lab}</span><button data-ab="${k}-" aria-label="−">−</button><b data-abv="${k}">${v}s</b><button data-ab="${k}+" aria-label="+">+</button></div>`;
+  return `<div class="autobar" id="abar" ${S.autoBar===0&&!o.always?'hidden':''}>
+    <button class="ab-play ${on?'on':''}" data-ab="play">${on?I.pause:I.play}<span>${on?L('Đang lướt','Running'):L('Tự lướt','Auto')}</span></button>
+    ${o.single?st('a',L('Mỗi thẻ','Each card'),a):st('q',L('Mặt trước','Front'),q)+st('a',L('Mặt sau','Back'),a)}
+    ${o.grade?`<div class="ab-g"><span>${L('Tự bấm','Auto grade')}</span>${[['again',L('Quên','Again')],['hard',L('Khó','Hard')],['good',L('Nhớ','Good')],['easy',L('Dễ','Easy')],['remind',L('Tự chấm','Manual')]].map(([k,l])=>`<button data-act="${k}" class="${act===k?'on':''}">${l}</button>`).join('')}</div>`:''}
+  </div>`}
+function bindAutoBar(bar,ctl){if(!bar)return;
+  bar.addEventListener('pointerdown',e=>e.stopPropagation());
+  bar.onclick=e=>{e.stopPropagation();const b=e.target.closest('button');if(!b)return;
+    if(b.dataset.act){ctl.set('autoAct',b.dataset.act);bar.querySelectorAll('[data-act]').forEach(x=>x.classList.toggle('on',x===b));return}
+    const k=b.dataset.ab;if(!k)return;
+    if(k==='play'){ctl.on=!ctl.on;b.classList.toggle('on',ctl.on);b.innerHTML=(ctl.on?I.pause:I.play)+`<span>${ctl.on?L('Đang lướt','Running'):L('Tự lướt','Auto')}</span>`;return}
+    const f=k[0],d=k[1]==='+'?1:-1;const field=f==='q'?'autoQ':'autoA';const nv=Math.max(1,Math.min(120,(f==='q'?ctl.q:ctl.a)+d));
+    ctl.set(field,nv);const v=bar.querySelector(`[data-abv="${f}"]`);if(v)v.textContent=nv+'s'}}
+
+/* ---- tạo deck mới: chọn cách học ---- */
+function newDeckDialog(st){
+  const v=document.createElement('div');v.className='veil';
+  v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:800;font-size:18px">${L('Tạo deck mới','New deck')}</div><button class="iconbtn" id="nx">${I.x}</button></div>
+   <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="nn" placeholder="${L('Ví dụ Grammar::N3','e.g. Grammar::N3')}"></label>
+   <div class="ohint">${L('Dùng :: để làm deck con.','Use :: for subdecks.')}</div>
+   <div class="ot" style="margin-top:14px">${L('Cách học','How to study')}</div>
+   <div class="modepick">
+    <label class="mp"><input type="radio" name="nm" value="srs" checked><span><b>${L('Học đề xuất','Scheduled')}</b><small>${L('App tính lịch ôn như Anki. Mỗi ngày chấm Nhớ/Quên các thẻ đến hạn.','Spaced repetition like Anki. Grade the cards due each day.')}</small></span></label>
+    <label class="mp"><input type="radio" name="nm" value="flip"><span><b>${L('Tự lướt thẻ','Flip through')}</b><small>${L('Muốn học lúc nào thì mở ra lướt. Không chấm điểm, không tính lịch, không cộng vào số thẻ hôm nay.','Open and flip whenever you like. No grading, no schedule.')}</small></span></label>
+   </div>
+   <div class="ohint">${L('Đổi lại sau được trong nút ⋯ của deck.','You can change this later in the deck ⋯ menu.')}</div>
+   <button class="btn bee" id="nok" style="width:100%;margin-top:14px">${L('Tạo deck','Create')}</button></div>`;
+  document.body.appendChild(v);const q=s=>v.querySelector(s);q('#nn').focus();
+  const close=()=>v.remove();v.onclick=e=>{if(e.target===v)close()};q('#nx').onclick=close;
+  const go=async()=>{const nm=q('#nn').value.trim();if(!nm)return q('#nn').focus();
+    if(st.decks.some(d=>d.name===nm)){toast(L('Đã có deck này','Deck exists'));return}
+    const mode=v.querySelector('[name=nm]:checked').value;
+    await ANKI.put('decks',{id:'d'+Date.now(),name:nm,at:Date.now(),cfgId:'1',mode});close();dropState();ankiBox()};
+  q('#nok').onclick=go;q('#nn').onkeydown=e=>{if(e.key==='Enter')go()};
+}
+
+/* ---- ngữ pháp bằng ảnh (mã hóa như đề) ---- */
+const GRAM=(()=>{let key=null,idx=null,loading=null;const urls=new Map();
+  async function load(){if(idx)return idx;if(loading)return loading;const code=ls.get('shiratama-code');if(!code)throw new Error('no code');
+    loading=(async()=>{const e=await fetch('data/gram/index.enc.json?v='+window.APPV).then(r=>{if(!r.ok)throw new Error('http');return r.json()});key=await deriveKey(code,b64(e.salt));
+      const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.data));idx=JSON.parse(new TextDecoder().decode(p));return idx})();
+    try{return await loading}catch(e){loading=null;throw e}}
+  function img(lv,n,tag){const k=lv+'/'+n+tag;if(urls.has(k))return urls.get(k);
+    const pr=(async()=>{const r=await fetch(`data/gram/${k}.bin?g=1`);if(!r.ok)throw new Error('http');const b=new Uint8Array(await r.arrayBuffer());
+      const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));return URL.createObjectURL(new Blob([p],{type:'image/webp'}))})();
+    urls.set(k,pr);pr.catch(()=>urls.delete(k));return pr}
+  return {load,img,get idx(){return idx}};
+})();
+const GLV=['N5','N4','N3','N2','N1'];
+function gramRows(){const g=GRAM.idx;
+  return `<div class="deckhead gramhead"><span class="grow">${L('Ngữ pháp · lướt ảnh','Grammar · flip images')}</span></div>
+  ${g?GLV.filter(l=>g[l]).map(l=>`<div class="deckrow" style="--d:0"><span class="tw"></span><button class="dn" data-gram="${l}">${l}</button><span class="dflip">${g[l].length} ${L('mẫu · lướt','points · flip')}</span><span style="width:34px"></span></div>`).join('')
+     :`<div class="tiny" style="padding:10px 0">${L('Đang mở ảnh ngữ pháp…','Loading grammar…')}</div>`}`}
+function gramInit(){const bind=()=>$$('[data-gram]').forEach(b=>b.onclick=()=>startGram(b.dataset.gram));
+  if(GRAM.idx)return bind();
+  GRAM.load().then(()=>{const box=$('#gramBox');if(box){box.innerHTML=gramRows();bind()}}).catch(()=>{const box=$('#gramBox');if(box)box.innerHTML=''})}
+
+/* ---- màn lướt ---- */
+const wideScreen=()=>innerWidth>innerHeight*1.15;
+function startFlipDeck(st,set,name){
+  const items=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
+  if(!items.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
+  openFlip({kind:'cards',key:'d:'+name,title:name.split('::').pop(),items})}
+function startGram(lv){const g=GRAM.idx;if(!g||!g[lv])return;
+  openFlip({kind:'gram',key:'g:'+lv,title:L('Ngữ pháp ','Grammar ')+lv,items:g[lv].map((x,n)=>Object.assign({lv,n},x))})}
+function openFlip(o){S.flipPos=S.flipPos||{};const at=S.flipPos[o.key]||0;
+  FV=Object.assign(o,{order:o.items,i:Math.min(at,o.items.length-1),show:false,auto:false,shuf:false,wide:wideScreen()});render()}
+function flipCfg(){S.flipAuto=Object.assign({q:4,a:4,img:8},S.flipAuto||{});return S.flipAuto}
+function renderFlip(){
+  const F=FV,it=F.items[F.i],N=F.items.length,cfg=flipCfg(),G=F.kind==='gram';
+  F.wide=wideScreen();
+  const body=G?`<div class="gstage" id="stage"><div class="gimg ${F.wide?'r':'s'}" id="gbox"><div class="gload tiny">${L('Đang mở ảnh…','Loading…')}</div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+`
+   :`<div class="stage" id="stage"><div class="fc ${F.show?'flip':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>`;
+  full(`<div class="sbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${I.x}</button>
+     <div class="ttl"><small>${esc(F.title)} · ${L('tự lướt','flip')}</small><span class="qc"><b>${F.i+1}</b><span class="tiny"> / ${N}</span></span></div>
+     <button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button>
+     ${G?'':`<button class="iconbtn" id="fvsm" aria-label="A−">A−</button><button class="iconbtn" id="fvsp" aria-label="A+">A+</button>`}</div>
+   <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
+   ${autoBarHTML(F.auto,cfg.q,G?cfg.img:cfg.a,null,{single:G,always:true})}
+   <div class="deckwrap flipwrap" id="akwrap">${body}
+     <div class="fvfoot">${G?`<div class="gcap"><b class="jp">${esc(it.jp)}</b> <span class="tiny">${esc(it.ro)}</span></div>`:''}<div class="fvnav"><button class="btn line" id="fvp" ${F.i?'':'disabled'}>‹ ${L('Trước','Prev')}</button>
+       <input type="range" id="fvr" class="grow" min="1" max="${N}" value="${F.i+1}" aria-label="${L('Đến thẻ','Go to card')}">
+       <button class="btn bee" id="fvn" ${F.i<N-1?'':'disabled'}>${L('Sau','Next')} ›</button></div>
+     <div class="tiny center fvhint">${G?L('Chạm nửa phải để sang ảnh sau, nửa trái để quay lại · vuốt ngang cũng được','Tap right half for next, left half for previous · or swipe'):L('Chạm thẻ để lật · vuốt trái sang thẻ sau, vuốt phải quay lại','Tap to flip · swipe left for next, right for previous')}<span class="desk"> · ← → ${L('và phím cách','and space')}</span></div></div></div>`);
+  if(!G)ANKI.hydrate($('#fc'));
+  const ring=sec=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
+  const unring=()=>{const r=$('#aring');if(r)r.classList.remove('run')};
+  const go=k=>{clearTimeout(F.at);if(k<0||k>=N){if(k>=N&&F.auto){F.auto=false;toast(L('Hết deck rồi','End of deck'))}renderFlip();return}F.i=k;F.show=false;if(!F.shuf){S.flipPos[F.key]=k;save()}renderFlip()};
+  const next=()=>go(F.i+1),prev=()=>go(F.i-1);
+  const flip=()=>{if(G)return;F.show=!F.show;SFX.play('flip');$('#fc').classList.toggle('flip',F.show);arm()};
+  const arm=()=>{clearTimeout(F.at);if(!F.auto)return unring();
+    if(G){ring(cfg.img);F.at=setTimeout(next,cfg.img*1000);return}
+    if(!F.show){ring(cfg.q);F.at=setTimeout(()=>{if(FV===F&&!F.show)flip()},cfg.q*1000)}else{ring(cfg.a);F.at=setTimeout(next,cfg.a*1000)}};
+  bindAutoBar($('#abar'),{get on(){return F.auto},set on(v){F.auto=v;arm()},get q(){return cfg.q},get a(){return G?cfg.img:cfg.a},
+    set(k,v){if(k==='autoQ')cfg.q=v;else if(G)cfg.img=v;else cfg.a=v;save()}});
+  $('#fvq').onclick=()=>{clearTimeout(F.at);FV=null;TAB='home';render()};
+  $('#fvsh').onclick=()=>{F.shuf=!F.shuf;const cur=F.items[F.i];F.items=F.shuf?shuffle(F.order.slice()):F.order.slice();F.i=F.shuf?0:Math.max(0,F.items.indexOf(cur));if(F.shuf)F.items.splice(F.items.indexOf(cur),1),F.items.unshift(cur);toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));renderFlip()};
+  if($('#fvsm')){$('#fvsm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook()};$('#fvsp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()}}
+  $('#fvp').onclick=prev;$('#fvn').onclick=next;$('#fvr').onchange=e=>go(+e.target.value-1);
+  $('#fvr').oninput=e=>{const q=document.querySelector('.qc b');if(q)q.textContent=e.target.value};
+  // ảnh ngữ pháp: vuông cho điện thoại, chữ nhật cho máy tính
+  if(G){const tag=F.wide?(it.r?'r':'s'):(it.s?'s':'r');
+    GRAM.img(it.lv,it.n,tag).then(u=>{if(FV!==F||F.items[F.i]!==it)return;const b=$('#gbox');if(b)b.innerHTML=`<img src="${u}" alt="${esc(it.jp)}" draggable="false">`}).catch(()=>{const b=$('#gbox');if(b)b.innerHTML=`<div class="gload tiny">${L('Không mở được ảnh này','Could not load this image')}</div>`});
+    for(const d of [1,2,-1]){const x=F.items[F.i+d];if(x){const t=F.wide?(x.r?'r':'s'):(x.s?'s':'r');GRAM.img(x.lv,x.n,t).catch(()=>{})}}}
+  // chạm, vuốt
+  const stage=$('#stage');let sx=0,sy=0,down=false;
+  stage.addEventListener('pointerdown',e=>{if(e.target.closest('a,button,input'))return;sx=e.clientX;sy=e.clientY;down=true});
+  stage.addEventListener('pointerup',e=>{if(!down)return;down=false;const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy))return dx<0?next():prev();
+    if(Math.abs(dx)>12||Math.abs(dy)>12)return;
+    if(G){const r=stage.getBoundingClientRect();return e.clientX>r.left+r.width/2?next():prev()}
+    flip()});
+  F.key=e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;
+    if(e.key==='ArrowRight'){e.preventDefault();next()}else if(e.key==='ArrowLeft'){e.preventDefault();prev()}
+    else if(e.key===' '||e.key==='Enter'){e.preventDefault();G?next():flip()}else if(e.key==='Escape')$('#fvq').click()};
+  arm();
+}
+window.addEventListener('resize',()=>{if(FV&&FV.kind==='gram'&&FV.wide!==wideScreen())renderFlip()});
 
 function render(){
   stopAudio();applyLook();
   if(!DATA)return lockScreen();
   if(SS)return renderSession();
   if(AK)return renderAnki();
+  if(FV)return renderFlip();
   document.body.classList.remove('editing');({home,browse,exam:examList,stats,examstats:examStats,sys}[TAB]||home)();
 }
 
@@ -268,7 +406,7 @@ function examList(){
   <div class="h">${L('Luyện theo phần','Practice by section')}</div>
   <div class="secgrid">${Object.keys(SEC).map(k=>{const qs=allBy(k);const t=qs.filter(q=>S.ans[q.id]).length;return `<button class="sec" data-prac="${k}"><div style="font-weight:800">${secName(k)}</div><div class="tiny" style="margin-top:6px">${t}/${qs.length} ${L('câu đã làm','done')}</div></button>`}).join('')}</div>
   <div class="h">${L('Đề thi thật','Real tests')}</div>
-  <div class="exchips">${exs.map(e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;return `<button class="exchip ${e===ex?'on':''}" data-exsel="${esc(e.id)}"><b>${esc(e.short||L('Đề mẫu 2018','Sample 2018'))}</b><small>${d?`${d}/${n}`:L('chưa làm','new')}</small></button>`}).join('')}</div>
+  <div class="exchips">${exs.map(e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;return `<button class="exchip ${e===ex?'on':''}" data-exsel="${esc(e.id)}"><b>${esc(exShort(e))}</b><small>${d?`${d}/${n}`:L('chưa làm','new')}</small></button>`}).join('')}</div>
   <div class="card"><div style="font-size:19px;font-weight:800">${esc(examTitle(ex))}</div><div class="tiny" style="margin-top:2px">${esc(ex.note?L(ex.note,ex.note):L('Nguồn: jlpt.jp · đáp án chính thức','Source: jlpt.jp · official answers'))}</div></div>
   ${ex.parts.map((p,i)=>{const qs=partQs(ex,p);return `<div class="card"><div style="font-size:17px;font-weight:800">${partName(p)}</div><div class="tiny">${qs.length} ${L('câu','questions')} · ${p.min} ${L('phút','min')}</div>
    <div class="row" style="margin-top:12px"><button class="btn bee" data-ex="${i}">${L('Thi thật','Timed test')}</button><button class="btn line" data-exp="${i}">${L('Luyện từng câu','One by one')}</button></div></div>`}).join('')}
@@ -325,7 +463,7 @@ function renderSession(){
     <details><summary>${L('Phiếu trả lời','Answer sheet')}</summary><div class="sheet">${SS.qs.map((x,k)=>`<button data-go="${k}" class="${SS.picks[x.id]!=null?'done':''} ${k===SS.i?'cur':''}">${k+1}</button>`).join('')}</div></details>`;
   else if(shown)nav=`<div class="navq"><button class="btn bee" id="next">${last?L('Xem kết quả','See results'):L('Câu tiếp','Next')}</button></div>`;
   const verdict=shown?`<div class="verdict ${pick===q.a?'ok':'ng'}">${pick===q.a?I.ok+' '+L('Chính xác','Correct'):(pick==null?L('Chưa chọn','No answer'):L('Chưa đúng','Wrong'))+' · '+L('đáp án ','answer ')+(q.a+1)}</div>`:'';
-  const qpane=`${q.audio?audioHTML(q):''}<div class="qmeta"><span class="pill">${esc(typeName(q))}</span></div>${stem}${verdict}<div class="opts">${opts}</div>${after}${nav}`;
+  const qpane=`${q.audio?audioHTML(q):''}<div class="qmeta"><span class="pill src">${esc(srcLabel(q,ex))}</span><span class="pill">${esc(typeName(q))}</span></div>${stem}${verdict}<div class="opts">${opts}</div>${after}${nav}`;
   const bar=exam?`<div class="tbar" id="tbar"><i id="tfill"></i></div>`:'';
   full(`<div class="sbar"><button class="iconbtn" id="quit" aria-label="Quit">${SS.kind==='view'?I.back:I.x}</button><div class="ttl">${esc(SS.title)}</div><span class="pill" id="qn">${SS.i+1}/${SS.qs.length}</span></div>
    ${bar}<div class="pbar"><i style="width:${(SS.i+1)/SS.qs.length*100}%"></i></div>
@@ -382,7 +520,7 @@ function resultScreen(s){
   shell(`<div class="top"><button class="iconbtn" id="back" aria-label="Back">${I.back}</button><div class="tiny">${esc(s.title)}</div><span style="width:40px"></span></div>
    <div class="card center"><img class="mascot s" src="img/mark.webp" alt=""><div class="big" style="font-size:46px">${c}<span class="muted" style="font-size:22px"> / ${n}</span></div><div class="muted small">${Math.round(c/n*100)}% · ${fmtTime((Date.now()-s.t0)/1000)}</div></div>
    <div class="h">${L('Theo dạng câu','By question type')}</div><div class="card">${Object.entries(byM).map(([k,o])=>`<div class="list-item"><div class="grow" style="font-size:15px">${esc(k)}</div><div class="meter ${o.c/o.n<.6?'low':''}" style="max-width:110px"><i style="width:${o.c/o.n*100}%"></i></div><b style="min-width:44px;text-align:right">${o.c}/${o.n}</b></div>`).join('')}</div>
-   <div class="h">${L('Xem lại từng câu','Review each question')}</div><div class="card">${s.qs.map((q,k)=>{const ok=s.picks[q.id]===q.a;return `<div class="list-item" data-rv="${k}" style="cursor:pointer"><span class="pill" style="color:${ok?'var(--ok)':'var(--ng)'}">${ok?'○':'×'}</span><div class="grow jp" style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(plain(q.q))}</div><span class="tiny">${s.picks[q.id]!=null?s.picks[q.id]+1:'–'} → ${q.a+1}</span></div>`}).join('')}</div>`,{tabs:false});
+   <div class="h">${L('Xem lại từng câu','Review each question')}</div><div class="card">${s.qs.map((q,k)=>{const ok=s.picks[q.id]===q.a;return `<div class="list-item" data-rv="${k}" style="cursor:pointer"><span class="pill" style="color:${ok?'var(--ok)':'var(--ng)'}">${ok?'○':'×'}</span><div class="grow jp" style="font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(plain(q.q))}<div class="tiny" style="font-family:inherit">${esc(srcLabel(q,QI[q.id].ex))}</div></div><span class="tiny">${s.picks[q.id]!=null?s.picks[q.id]+1:'–'} → ${q.a+1}</span></div>`}).join('')}</div>`,{tabs:false});
   $('#back').onclick=()=>{TAB='home';render()};
   $$('[data-rv]').forEach(b=>b.onclick=()=>{SS=Object.assign({},s,{kind:'view',i:+b.dataset.rv,back:s});renderSession()});
 }
@@ -414,7 +552,8 @@ function retr(c,now){const k=c.card;if(!k.stability||!k.last_review)return 1;con
 function ankiQueue(cards,deckSet,decks,topName){
   const now=Date.now(),de=dayEnd(),dk=dayKey(),D=daily();
   const byId={};(decks||[]).forEach(d=>byId[d.id]=d);
-  const mine=cards.filter(c=>!c.susp&&c.buried!==dk&&(!deckSet||deckSet.has(c.deck)));
+  const fl=flipIds(decks||[]);
+  const mine=cards.filter(c=>!c.susp&&c.buried!==dk&&!fl.has(c.deck)&&(!deckSet||deckSet.has(c.deck)));
   const learn=[],rev=[],fresh=[];
   mine.forEach(c=>{const st=c.card.state;if(st===0)fresh.push(c);else if(isDue(c,now,de))(st===2?rev:learn).push(c)});
   const top=topName&&decks?decks.find(d=>d.name===topName):null;const TP=presetOf(top);
@@ -443,8 +582,9 @@ async function ankiBox(){
   const row=(name,depth)=>{const n=tree.nodes[name];const set=nodeSet(st,tree,name);const q=ankiQueue(st.cards,set,st.decks,name);const kids=n.kids.length;const short=name.split('::').pop();
     let h=`<div class="deckrow" style="--d:${depth}">
       ${kids?`<button class="tw" data-tw="${esc(name)}" aria-label="${L('Mở/đóng','Toggle')}">${col[name]?'▸':'▾'}</button>`:'<span class="tw"></span>'}
-      <button class="dn" data-study="${esc(name)}">${esc(short)}</button>
-      <span class="dc new">${q.fresh.length||''}</span><span class="dc lrn">${q.learn.length||''}</span><span class="dc due">${q.rev.length||''}</span>
+      ${modeOf(name,st.decks)==='flip'?`<button class="dn" data-flipd="${esc(name)}">${esc(short)}</button><span class="dflip">${st.cards.filter(c=>!c.susp&&set.has(c.deck)).length} ${L('thẻ · lướt','cards · flip')}</span>`
+       :`<button class="dn" data-study="${esc(name)}">${esc(short)}</button>
+      <span class="dc new">${q.fresh.length||''}</span><span class="dc lrn">${q.learn.length||''}</span><span class="dc due">${q.rev.length||''}</span>`}
       <button class="iconbtn sm" data-opt="${esc(name)}" aria-label="${L('Tùy chọn deck','Deck options')}">${I.dots}</button></div>`;
     if(kids&&!col[name])n.kids.forEach(k=>h+=row(k,depth+1));return h};
   const nAll=tot.due.length+tot.fresh.length;
@@ -465,17 +605,19 @@ async function ankiBox(){
    <div class="tiny" id="impMsg"></div></div>
    <div class="card deckcard">
    ${st.cards.length?`<div class="deckhead"><span class="grow">Deck</span><span class="dc new">${L('Mới','New')}</span><span class="dc lrn">${L('Học','Learn')}</span><span class="dc due">${L('Ôn','Due')}</span><span style="width:34px"></span></div>
-   <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}</div>`;
+   <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}
+   <div id="gramBox">${gramRows()}</div></div>`;
+  gramInit();
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
   const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
   $$('[data-tw]').forEach(b=>b.onclick=()=>{S.collapsed=S.collapsed||{};S.collapsed[b.dataset.tw]=!S.collapsed[b.dataset.tw];save();ankiBox()});
   $$('[data-study]').forEach(b=>b.onclick=()=>startAnki(nodeSet(st,tree,b.dataset.study),b.dataset.study));
+  $$('[data-flipd]').forEach(b=>b.onclick=()=>startFlipDeck(st,nodeSet(st,tree,b.dataset.flipd),b.dataset.flipd));
   $$('[data-opt]').forEach(b=>b.onclick=()=>deckOptions(b.dataset.opt));
   $('#addC').onclick=()=>addCards();
   $('#goBr').onclick=()=>{TAB='browse';S.lastStudy='browse';save();BR.sel=null;render()};
-  $('#newD').onclick=async()=>{const nm=prompt(L('Tên deck mới (dùng :: để làm deck con, ví dụ Grammar+::N3):','New deck name (use :: for subdecks):'));if(!nm||!nm.trim())return;
-    if(st.decks.some(d=>d.name===nm.trim())){toast(L('Đã có deck này','Deck exists'));return}await ANKI.put('decks',{id:'d'+Date.now(),name:nm.trim(),at:Date.now(),cfgId:'1'});dropState();ankiBox()};
+  $('#newD').onclick=()=>newDeckDialog(st);
   $('#ankiImp').onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='.apkg,.colpkg';i.onchange=async()=>{const msg=$('#impMsg');
     try{const r=await ANKI.importApkg(i.files[0],t=>msg.textContent=t);msg.textContent=L(`Đã nhập ${r.cards} thẻ từ ${r.decks} deck, giữ nguyên lịch ôn.`,`Imported ${r.cards} cards from ${r.decks} decks.`);dropState();setTimeout(ankiBox,1500)}
     catch(e){msg.textContent=L('Không nhập được: ','Import failed: ')+e.message}};i.click()};
@@ -533,10 +675,10 @@ async function deckOptions(name){
      <label class="lab">${L('Nghĩ lâu hơn số giây này thì chỉ tính bằng số này','Count at most this many seconds')}<input class="field" id="ocap" type="number" min="5" value="${c.capSec}"></label>
      ${H(L('Để thống kê thời gian học không bị đội lên khi anh bỏ đi giữa chừng.','Keeps study time stats sane if you walk away mid-card.'))}</div>
    <div class="osec"><div class="ot">${L('Tự lướt thẻ','Auto advance')}</div>
-     ${H(L('Bật trong lúc học bằng nút ⋯ ở góc trên. App tự lật thẻ và tự chuyển thẻ theo số giây dưới đây.','Turn on while studying from the ⋯ button.'))}
+     ${H(L('Bấm ▶ Tự lướt trên thanh ngay dưới thẻ khi đang học. App tự lật thẻ và tự chuyển thẻ theo số giây dưới đây.','Turn on while studying from the ⋯ button.'))}
      <label class="lab">${L('Mặt trước hiện bao nhiêu giây rồi tự lật','Seconds before showing the answer')}<input class="field" id="oaq" type="number" min="1" value="${c.autoQ}"></label>
      <label class="lab">${L('Mặt sau hiện bao nhiêu giây','Seconds to show the answer')}<input class="field" id="oaa" type="number" min="1" value="${c.autoA}"></label>
-     <label class="lab">${L('Hết giờ mặt sau mà anh chưa chấm thì','When time runs out')}${opt('oact',c.autoAct,[['again',L('Tính là Quên','Count as Forgot')],['good',L('Tính là Nhớ','Count as Remembered')],['remind',L('Chỉ nhắc, chờ anh chấm','Just remind me')]])}</label></div>
+     <label class="lab">${L('Hết giờ mặt sau mà anh chưa chấm thì','When time runs out')}${opt('oact',c.autoAct,[['again',L('Tính là Quên','Count as Again')],['hard',L('Tính là Khó','Count as Hard')],['good',L('Tính là Nhớ','Count as Good')],['easy',L('Tính là Dễ','Count as Easy')],['remind',L('Chỉ nhắc, chờ anh chấm','Just remind me')]])}</label></div>
    <div class="osec"><div class="ot">${L('Cách tính lịch ôn','Scheduling')}</div>
      <label class="lab">${L('Muốn nhớ được bao nhiêu phần trăm thẻ','Target memory rate')} <b id="oretv">${Math.round(c.ret*100)}%</b><input type="range" id="oret" min="70" max="99" value="${Math.round(c.ret*100)}"></label>
      ${H(L('Cao hơn thì ôn dày hơn, nhớ chắc hơn nhưng mỗi ngày nhiều thẻ hơn. 90% là mức Anki khuyên dùng.','Higher means more reviews per day but better memory. 90% is the usual choice.'))}
@@ -546,6 +688,8 @@ async function deckOptions(name){
      ${H(L('Dù thẻ dễ đến đâu cũng không để lâu hơn số ngày này.','Even easy cards come back within this many days.'))}</div>
    <div class="osec"><div class="ot">${L('Deck này','This deck')}</div>
      <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="oname" value="${esc(name)}"></label>
+     <label class="lab">${L('Cách học deck này','How to study this deck')}${opt('omode',modeOf(name,st.decks),[['srs',L('Học đề xuất (app tính lịch ôn)','Scheduled (spaced repetition)')],['flip',L('Tự lướt thẻ (không tính lịch)','Flip through (no scheduling)')]])}</label>
+     ${H(L('Tự lướt: mở ra là lướt hết thẻ theo thứ tự, không chấm Nhớ/Quên, không tính vào số thẻ cần học hôm nay. Lịch ôn cũ của thẻ vẫn giữ nguyên, đổi lại học đề xuất là tiếp tục như trước.','Flip: browse all cards in order without grading. Existing schedules are kept.'))}
      ${H(L('Dùng :: để làm deck con, ví dụ "FPT::JPD316".','Use :: for subdecks, e.g. "FPT::JPD316".'))}
      ${sw('osub',false,L('Cho các deck con dùng chung bộ cài đặt này','Apply preset to all subdecks'))}</div>
    <div class="row wrapbtn" style="margin:6px 0 4px"><button class="btn line sm" id="obrowse">${L('Xem thẻ','Browse')}</button><button class="btn line sm" id="oadd">${L('Thêm thẻ','Add')}</button><button class="btn line sm" id="ostat">${L('Thống kê','Stats')}</button><button class="btn line sm" id="oexp">${L('Xuất file','Export')}</button><button class="btn line sm" id="odel" style="color:var(--ng)">${L('Xóa deck','Delete')}</button></div>
@@ -569,7 +713,7 @@ async function deckOptions(name){
     q('#osave').onclick=async()=>{collect();savePresets(P);for(const k in FS)delete FS[k];
       const nn=q('#oname').value.trim();
       const targets=q('#osub').checked?st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::')):[d];
-      targets.forEach(x=>x.cfgId=pid);await ANKI.putMany('decks',targets);
+      targets.forEach(x=>x.cfgId=pid);const md=q('#omode').value;if(modeOf(name,st.decks)!==md||d.mode)d.mode=md;if(!targets.includes(d))targets.push(d);await ANKI.putMany('decks',targets);
       if(nn&&nn!==name){const rows=st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::'));rows.forEach(x=>x.name=nn+x.name.slice(name.length));await ANKI.putMany('decks',rows)}
       toast(L('Đã lưu','Saved'));close()};
     q('#obrowse').onclick=()=>{v.remove();TAB='browse';BR.q=`deck:"${name}"`;BR.sel=null;render()};
@@ -819,12 +963,13 @@ function renderAnki(){
      <button class="iconbtn" id="akundo" aria-label="${L('Hoàn tác','Undo')}" ${AK.hist.length?'':'disabled'}>${I.undo}</button>
      <button class="iconbtn ${AK.auto?'on':''}" id="akmenu" aria-label="${L('Tùy chọn','More')}">${I.dots}</button>
      <div class="akpop" id="akpop">
-       <button id="akauto" class="${AK.auto?'on':''}">${I.play}<span>${AK.auto?L('Đang tự lướt','Auto advance on'):L('Tự lướt thẻ','Auto advance')}<small>${L(`Mặt trước ${P.autoQ}s, mặt sau ${P.autoA}s, hết giờ thì ${P.autoAct==='good'?'Nhớ':P.autoAct==='remind'?'chỉ nhắc':'Quên'}`,`Front ${P.autoQ}s, back ${P.autoA}s`)}</small></span></button>
+       <button id="akauto" class="${S.autoBar!==0?'on':''}">${I.play}<span>${L('Thanh tự lướt','Auto advance bar')}<small>${S.autoBar!==0?L('Đang hiện, bấm để ẩn','Shown, tap to hide'):L('Đang ẩn, bấm để hiện','Hidden, tap to show')}</small></span></button>
        <div class="row"><button id="aksm">A−</button><button id="aksp">A+</button></div>
        <button id="akmu" class="${MUSIC.on?'on':''}">${I.note}<span>${L('Nhạc nền','Music')}</span></button>
        <button id="akedit">${I.pen}<span>${L('Sửa thẻ này','Edit this card')}</span></button>
      </div></div>
    <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
+   ${autoBarHTML(AK.auto,P.autoQ,P.autoA,P.autoAct,{grade:true})}
    <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
@@ -839,14 +984,20 @@ function renderAnki(){
   $('#akmenu').onclick=e=>{e.stopPropagation();$('#akpop').classList.toggle('open')};
   $('#akpop').onclick=e=>e.stopPropagation();
   document.body.onclick=()=>{const p=$('#akpop');if(p)p.classList.remove('open')};
-  $('#akauto').onclick=()=>{AK.auto=!AK.auto;$('#akpop').classList.remove('open');renderAnki()};
+  $('#akauto').onclick=()=>{S.autoBar=S.autoBar===0?1:0;save();$('#akpop').classList.remove('open');const b=$('#abar');if(b)b.hidden=S.autoBar===0;const e=$('#akauto');e.classList.toggle('on',S.autoBar!==0);e.querySelector('small').textContent=S.autoBar!==0?L('Đang hiện, bấm để ẩn','Shown, tap to hide'):L('Đang ẩn, bấm để hiện','Hidden, tap to show')};
   const fc=$('#fc'),stage=$('#stage');
   let busy=false;
   const ring=(sec)=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
   const flip=()=>{AK.show=true;SFX.play('flip');dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akwrap').classList.add('shown');
-    clearTimeout(AK.at);if(AK.auto){ring(P.autoA);AK.at=setTimeout(()=>{if(!AK||AK.list[AK.i]!==it)return;if(P.autoAct==='remind'){SFX.play('tap');dogSay($('#akdog'),L('Anh ơi, chấm thẻ này nè','Time to grade this one'),2500)}else grade(P.autoAct==='good'?3:1)},P.autoA*1000)}};
-  clearTimeout(AK.at);if(AK.auto){ring(P.autoQ);AK.at=setTimeout(()=>{if(AK&&AK.list[AK.i]===it&&!AK.show)flip()},P.autoQ*1000)}
-  const grade=async(g)=>{if(busy)return;busy=true;clearTimeout(AK.at);glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');sprAct($('#akdog'),g===3?'yay':'sad',g===3?900:1300);AK.dogAct=[g===3?'yay':'sad',Date.now()];fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
+    armA()};
+  const armA=()=>{clearTimeout(AK.at);if(!AK.auto)return;ring(P.autoA);AK.at=setTimeout(()=>{if(!AK||AK.list[AK.i]!==it)return;if(P.autoAct==='remind'){SFX.play('tap');dogSay($('#akdog'),L('Anh ơi, chấm thẻ này nè','Time to grade this one'),2500)}else grade(GRADE_OF[P.autoAct]||1)},P.autoA*1000)};
+  const armQ=()=>{clearTimeout(AK.at);if(!AK.auto)return;ring(P.autoQ);AK.at=setTimeout(()=>{if(AK&&AK.list[AK.i]===it&&!AK.show)flip()},P.autoQ*1000)};
+  const unring=()=>{const r=$('#aring');if(r)r.classList.remove('run')};
+  bindAutoBar($('#abar'),{get on(){return AK.auto},set on(v){AK.auto=v;if(v){AK.show?armA():armQ()}else{clearTimeout(AK.at);unring()}},
+    get q(){return P.autoQ},get a(){return P.autoA},get act(){return P.autoAct},
+    set(k,v){P[k]=v;const PP=presets(),id=String((deck&&deck.cfgId)||'1');PP[id]=Object.assign({},PDEF,PP[id],{[k]:v});savePresets(PP)}});
+  armQ();
+  const grade=async(g)=>{if(busy)return;busy=true;clearTimeout(AK.at);glow(stage,g>1);SFX.play(g>1?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g>1?'hop':'tilt');sprAct($('#akdog'),g>1?'yay':'sad',g>1?900:1300);AK.dogAct=[g>1?'yay':'sad',Date.now()];fc.style.transform='';fc.classList.add(g>1?'fly-r':'fly-l');
     const prev=JSON.parse(JSON.stringify(it));const pos=AK.i;const was=it.card.state;const ms=Math.min(P.capSec*1000,Date.now()-shown0);
     const D=daily();const dsnap=JSON.parse(JSON.stringify(D));
     if(hasF)it.card=schedule(it.card,g,P);
@@ -882,7 +1033,8 @@ function renderAnki(){
   fc.addEventListener('pointerup',end);fc.addEventListener('pointercancel',()=>{drag=false;fc.style.transform='';fc.style.transition=''});
   AK.key=e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;
     if(!AK.show){if(e.key===' '||e.key==='Enter'){e.preventDefault();flip()}}
-    else if(e.key==='ArrowRight'||e.key==='2'||e.key==='3'||e.key==='4'||e.key===' '||e.key==='Enter'){e.preventDefault();grade(3)}
+    else if(e.key==='2'||e.key==='4'){e.preventDefault();grade(+e.key)}
+    else if(e.key==='ArrowRight'||e.key==='3'||e.key===' '||e.key==='Enter'){e.preventDefault();grade(3)}
     else if(e.key==='ArrowLeft'||e.key==='1'){e.preventDefault();grade(1)}
     if((e.key==='z'&&(e.ctrlKey||e.metaKey))||e.key==='Backspace'){e.preventDefault();undoAnki()}};
 }
@@ -895,7 +1047,7 @@ async function undoAnki(){
     if(h.sib&&h.sib.length){const all=await ANKI.all('cards');const back=all.filter(c=>h.sib.includes(c.id));back.forEach(c=>{delete c.buried});await ANKI.putMany('cards',back)}}catch(e){}
   dropState();renderAnki();
 }
-document.addEventListener('keydown',e=>{if(AK&&AK.key)AK.key(e)});
+document.addEventListener('keydown',e=>{if(AK&&AK.key)AK.key(e);else if(FV&&FV.key)FV.key(e)});
 
 /* ---------- thống kê (giống Anki) ---------- */
 const STA={deck:'',range:'m1'};

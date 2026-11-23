@@ -447,3 +447,10 @@ body.editing .bedit{display:block}
 }
 @media (min-width:1280px){.homegrid{grid-template-columns:minmax(340px,400px) minmax(0,1fr)}}
 .deckrow .dn{min-width:90px}
+/* thẻ luôn căn giữa (ngang và dọc); thẻ dài vẫn cuộn được từ đầu */
+.fc .face,.fc .back{justify-content:flex-start;text-align:center}
+.fc .face>:first-child{margin-top:auto}
+.fc .face>:last-child{margin-bottom:auto}
+.fc .back .ans{text-align:center}
+.preview .ans{text-align:center}
+.fc .face>.fin{margin:auto 0;width:100%}

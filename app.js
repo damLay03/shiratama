@@ -664,6 +664,24 @@ async function editCard(c,st,done,quiet){
   $('#eforget').onclick=()=>{if(confirm(L('Đưa thẻ này về thẻ mới?','Reset this card to new?')))upd({card:emptyCard(),appAt:Date.now()})};
   $('#edel').onclick=async()=>{if(!confirm(L('Xóa thẻ này?','Delete this card?')))return;await ANKI.del('cards',c.id);BR.sel=null;document.body.classList.remove('editing');toast(L('Đã xóa','Deleted'));done()};
 }
+// sửa thẻ ngay trong lúc học, xong quay lại đúng thẻ đó
+function quickEdit(it){
+  const [f,b]=fieldsOf(it);const v=document.createElement('div');v.className='veil';
+  v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:8px"><div class="grow" style="font-weight:800;font-size:18px">${L('Sửa thẻ','Edit card')}</div><button class="iconbtn" id="qx" aria-label="Close">${I.x}</button></div>
+   <label class="lab">${L('Mặt trước','Front')}<textarea class="field mono" id="qf" rows="2">${esc(f)}</textarea></label>
+   <label class="lab">${L('Mặt sau','Back')}<textarea class="field mono" id="qb" rows="8">${esc(b)}</textarea></label>
+   <label class="lab">Tags<input class="field" id="qt" value="${esc(it.tags||'')}"></label>
+   <div class="row wrapbtn" style="margin-top:14px"><button class="btn bee grow" id="qs">${L('Lưu và học tiếp','Save and continue')}</button><button class="btn line" id="qsu">${it.susp?L('Bỏ ẩn','Unsuspend'):L('Ẩn thẻ này','Suspend')}</button></div>
+   <div class="ohint">${L('Mặt sau viết HTML như trong Anki: &lt;br&gt; để xuống dòng.','Back uses HTML like Anki: &lt;br&gt; for a new line.')}</div></div>`;
+  const close=()=>{v.remove()};
+  v.onclick=e=>{if(e.target===v)close()};v.querySelector('#qx').onclick=close;
+  v.querySelector('#qs').onclick=async()=>{const nf=v.querySelector('#qf').value,nb=v.querySelector('#qb').value;
+    Object.assign(it,{tags:v.querySelector('#qt').value.trim(),fl:isSimple(it)?[nf,nb].concat(it.fl.slice(2)):it.fl,front:nf,back:nf+'<hr id=answer>'+nb,edited:1});
+    try{await ANKI.put('cards',it);toast(L('Đã lưu','Saved'))}catch(e){toast(L('Không lưu được','Could not save'))}
+    close();const show=AK&&AK.show;renderAnki();if(show){const fc=$('#fc');if(fc){AK.show=true;fc.classList.add('flip');$('#stage')&&$('#stage').classList.add('shown')}}};
+  v.querySelector('#qsu').onclick=async()=>{it.susp=it.susp?0:1;await ANKI.put('cards',it).catch(()=>{});close();if(it.susp){toast(L('Đã ẩn thẻ','Card suspended'));AK.list.splice(AK.i,1);AK.show=false}renderAnki()};
+  document.body.appendChild(v);
+}
 function fmtIvl(d){if(d==null)return '';if(d<0){const s=-d;return s<3600?Math.round(s/60)+L(' phút','m'):Math.round(s/3600)+L(' giờ','h')}if(d===0)return '';return d<30?d+L(' ngày','d'):d<365?(d/30).toFixed(1)+L(' tháng','mo'):(d/365).toFixed(1)+L(' năm','y')}
 
 /* ---------- học ---------- */
@@ -712,7 +730,7 @@ function renderAnki(){
   const cnt={n:0,l:0,r:0};AK.list.slice(AK.i).forEach(c=>{const s=c.card.state;if(s===0)cnt.n++;else if(s===2)cnt.r++;else cnt.l++});
   full(`<div class="sbar"><button class="iconbtn" id="akq" aria-label="Stop">${I.x}</button><div class="ttl">${AK.title?esc(AK.title)+' · ':''}<span class="qc"><b class="cn ${it.card.state===0?'cur':''}">${cnt.n}</b> <b class="cl ${it.card.state===1||it.card.state===3?'cur':''}">${cnt.l}</b> <b class="cr ${it.card.state===2?'cur':''}">${cnt.r}</b></span>${P.showTimer?` · <span id="aktm">0:00</span>`:''}</div><button class="iconbtn sm2" id="aksm" aria-label="A-">A−</button><button class="iconbtn sm2" id="aksp" aria-label="A+">A+</button><button class="iconbtn sm2 ${MUSIC.on?'on':''}" id="akmu" aria-label="${L('Nhạc','Music')}">${I.note}</button><button class="iconbtn" id="akedit" aria-label="Edit">${I.pen}</button><button class="iconbtn" id="akundo" aria-label="Undo" ${AK.hist.length?'':'disabled style="opacity:.35"'}>${I.undo}</button></div>
    <div class="dstat"><span class="a">${L('Quên','Forgot')} ${AK.a}</span><span class="g">${L('Nhớ','Remembered')} ${AK.g}</span></div>
-   <div class="deckwrap"><div class="stage" id="stage"><div class="fc" id="fc"><div class="face front">${it.front}</div><div class="face back">${backHTML(it)}</div></div>
+   <div class="deckwrap"><div class="stage" id="stage"><div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
      <div class="zone l">← ${L('Quên','Forgot')}</div><div class="zone r">${L('Nhớ','Remembered')} →</div></div>
      <div class="akfoot">${dog('buddy','akdog')}<div class="tiny center grow" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div></div></div>`);
   ANKI.hydrate($('#fc'));
@@ -722,7 +740,7 @@ function renderAnki(){
   $('#aksm').onclick=e=>{e.stopPropagation();S.size=Math.max(0,S.size-1);save();applyLook()};
   $('#aksp').onclick=e=>{e.stopPropagation();S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()};
   $('#akmu').onclick=e=>{MUSIC.toggle();e.currentTarget.classList.toggle('on',MUSIC.on)};
-  $('#akedit').onclick=()=>{clearInterval(AK.tmr);BR.sel=it.id;BR.q='';BR.pick=null;AK=null;dropState();TAB='browse';render()};
+  $('#akedit').onclick=e=>{e.stopPropagation();quickEdit(it)};
   const fc=$('#fc'),stage=$('#stage');
   let busy=false;
   const flip=()=>{AK.show=true;dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akhint').innerHTML=L('Chạm nửa phải hoặc vuốt phải = Nhớ · nửa trái hoặc vuốt trái = Quên','Right half or swipe right = Remembered · left half or swipe left = Forgot')+`<span class="desk"> · ${L('phím 1 = Quên, phím 2 hoặc cách = Nhớ','key 1 = Forgot, 2 or space = Remembered')}</span>`};

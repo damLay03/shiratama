@@ -14,7 +14,11 @@ function script(u){return loaded[u]||(loaded[u]=new Promise((res,rej)=>{const s=
 /* ---------- IndexedDB ---------- */
 const DBN='shiratama-anki';
 let dbp=null;
-function db(){return dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open(DBN,1);r.onupgradeneeded=()=>{const d=r.result;d.createObjectStore('cards',{keyPath:'id'}).createIndex('deck','deck');d.createObjectStore('decks',{keyPath:'id'});d.createObjectStore('media',{keyPath:'name'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))}
+function db(){return dbp||(dbp=new Promise((res,rej)=>{const r=indexedDB.open(DBN,2);r.onupgradeneeded=()=>{const d=r.result;const has=n=>d.objectStoreNames.contains(n);
+  if(!has('cards'))d.createObjectStore('cards',{keyPath:'id'}).createIndex('deck','deck');
+  if(!has('decks'))d.createObjectStore('decks',{keyPath:'id'});
+  if(!has('media'))d.createObjectStore('media',{keyPath:'name'});
+  if(!has('revlog'))d.createObjectStore('revlog',{keyPath:'id'})};r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}))}
 async function tx(store,mode,fn){const d=await db();return new Promise((res,rej)=>{const t=d.transaction(store,mode);const out=fn(t.objectStore(store));t.oncomplete=()=>res(out&&out.result!==undefined?out.result:out);t.onerror=()=>rej(t.error)})}
 const all=(store)=>tx(store,'readonly',s=>s.getAll());
 const put=(store,v)=>tx(store,'readwrite',s=>s.put(v));
@@ -143,10 +147,56 @@ async function importApkg(file,onStep){
   return {cards:out.length,decks:deckRows.length,fsrsN,replay,media:media.length,skipped,kept};
 }
 
-/* ---------- media trong thẻ ---------- */
-const urlCache={};
-async function hydrate(el){const imgs=el.querySelectorAll('img[src]');for(const im of imgs){const n=decodeURIComponent(im.getAttribute('src'));if(/^(https?:|data:|blob:)/.test(n))continue;
-  if(!urlCache[n]){const m=await tx('media','readonly',s=>s.get(n));if(m)urlCache[n]=URL.createObjectURL(m.blob)}if(urlCache[n])im.src=urlCache[n]}}
+/* ---------- bộ sưu tập dựng sẵn trong app (data/col, mã hóa bằng mã mở đề) ---------- */
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+async function kdf(code,salt){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(code.trim()),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt'])}
+async function gunzip(buf){const ds=new DecompressionStream('gzip');const st=new Blob([buf]).stream().pipeThrough(ds);return await new Response(st).text()}
+const lsg=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
+const lss=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+async function loadBundle(code,onStep){
+  let head;try{head=await fetch('data/col/col.enc.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw 0;return r.json()})}catch(e){return null}
+  const have=lsg('shiratama-colv',0);
+  const cnt=await tx('cards','readonly',s=>s.count());
+  if(have>=head.v&&cnt>0)return null;
+  onStep&&onStep('Đang mở bộ thẻ…');
+  const key=await kdf(code,b64(head.salt));
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(head.iv)},key,b64(head.data));
+  const B=JSON.parse(await gunzip(plain));
+  onStep&&onStep('Đang lưu thẻ…');
+  const prev={};(await all('cards')).forEach(x=>prev[x.id]=x);
+  const ids=new Set();let kept=0;
+  const cards=B.cards.map(c=>{ids.add(c.id);const o=prev[c.id];const lr=c.card.last_review?new Date(c.card.last_review).getTime():0;
+    if(o&&o.appAt&&o.appAt>lr){kept++;return Object.assign({},c,{card:o.card,appAt:o.appAt,susp:o.susp,front:o.edited?o.front:c.front,back:o.edited?o.back:c.back})}return c});
+  await putMany('decks',B.decks);await putMany('cards',cards);
+  // lịch sử ôn: gộp với lượt ôn đã làm trong app
+  const oldRev={};(await all('revlog')).forEach(r=>oldRev[r.id]=r.logs);
+  const revRows=Object.entries(B.revlog).map(([id,logs])=>{const extra=(oldRev[id]||[]).filter(l=>l[0]>(logs.length?logs[logs.length-1][0]:0));return {id,logs:logs.concat(extra)}});
+  await putMany('revlog',revRows);
+  // thẻ đã xóa bên Anki (id 'a…' không còn trong bộ mới)
+  const stale=Object.keys(prev).filter(id=>id[0]==='a'&&!ids.has(id));
+  if(stale.length)await tx('cards','readwrite',s=>{stale.forEach(id=>s.delete(id))});
+  lss('shiratama-media',{map:B.media,salt:B.msalt});lss('shiratama-colv',head.v);
+  return {cards:cards.length,kept,removed:stale.length};
+}
 
-window.ANKI={importApkg,all,put,delDeck,hydrate};
+/* ---------- media trong thẻ ---------- */
+const urlCache={};let mkey=null;
+async function mediaFromBundle(n){
+  const M=lsg('shiratama-media',null);if(!M||!M.map[n])return null;
+  const code=lsg('shiratama-code',null);if(!code)return null;
+  if(!mkey)mkey=await kdf(code,b64(M.salt));
+  const [h,type]=M.map[n];const buf=new Uint8Array(await fetch('data/col/m/'+h+'.bin').then(r=>r.arrayBuffer()));
+  const raw=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.subarray(0,12)},mkey,buf.subarray(12));
+  const blob=new Blob([raw],{type});try{await put('media',{name:n,blob})}catch(e){}return blob;
+}
+async function hydrate(el){const imgs=el.querySelectorAll('img[src]');for(const im of imgs){const n=decodeURIComponent(im.getAttribute('src'));if(/^(https?:|data:|blob:)/.test(n))continue;
+  try{if(!urlCache[n]){const m=await tx('media','readonly',s=>s.get(n));const blob=m?m.blob:await mediaFromBundle(n);if(blob)urlCache[n]=URL.createObjectURL(blob)}}catch(e){}
+  if(urlCache[n])im.src=urlCache[n]}}
+
+async function logReview(id,entry){const r=await tx('revlog','readonly',s=>s.get(id));const row=r||{id,logs:[]};row.logs.push(entry);await put('revlog',row)}
+async function getRev(id){return tx('revlog','readonly',s=>s.get(id))}
+const del=(store,id)=>tx(store,'readwrite',s=>s.delete(id));
+
+window.ANKI={importApkg,all,put,putMany,del,delDeck,hydrate,loadBundle,logReview,getRev};
 })();

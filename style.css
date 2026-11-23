@@ -47,7 +47,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 /* ---------- tabs ---------- */
 .tabs{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(10px + env(safe-area-inset-bottom));width:min(440px,calc(100% - 24px));background:var(--card);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-radius:22px;box-shadow:var(--shadow);display:flex;padding:6px;z-index:20}
 .tabs button{flex:1;background:none;border:0;border-radius:16px;padding:7px 2px 6px;font-size:11.5px;font-weight:700;color:var(--ink3);display:flex;flex-direction:column;align-items:center;gap:1px}
-.tabs button b{font-family:var(--jp);font-size:18px;font-weight:700;line-height:1.2}
+.tabs button b{display:grid;place-items:center;height:26px}
 .tabs button.on{background:var(--bee);color:var(--bee-ink)}
 /* ---------- khối ---------- */
 .card{background:var(--card);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-radius:22px;padding:18px;box-shadow:var(--shadow);margin-bottom:14px}
@@ -168,3 +168,73 @@ details summary{cursor:pointer;color:var(--ink2);font-size:14px;font-weight:700;
 .fc .back .q{font-family:var(--jp);font-size:calc(var(--jp-size) + 4px);text-align:center;width:100%}
 .fc .back .ans{width:100%;text-align:left;font-family:var(--ui);font-size:17px;line-height:1.6}
 .fc .back .ans b{font-weight:800}
+
+/* ---------- deck (giống Anki) ---------- */
+.panel{max-height:92vh;overflow:auto}
+.lab{display:block;font-size:13px;font-weight:700;color:var(--ink2);margin-top:12px}
+.lab .field,.lab input[type=range]{margin-top:6px}
+.lab input[type=range]{width:100%;accent-color:var(--bee-deep)}
+.field.mono,textarea.field{font-family:var(--ui);font-size:15px;letter-spacing:0;line-height:1.5;resize:vertical}
+select.field{letter-spacing:0;font-size:15px}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;margin-top:10px}
+.wrapbtn{flex-wrap:wrap;gap:8px}
+.btn.sm{padding:7px 12px;font-size:13px}
+.iconbtn.sm{width:34px;height:34px;box-shadow:none;background:transparent;flex:0 0 auto}
+.deckhead{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:800;color:var(--ink3);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 4px;border-bottom:1px solid var(--line)}
+.deckrow{display:flex;align-items:center;gap:6px;padding:4px 0 4px calc(var(--d)*18px);border-bottom:1px solid var(--line)}
+.deckrow:last-child{border-bottom:0}
+.deckrow .tw{width:24px;flex:0 0 24px;border:0;background:none;color:var(--ink3);font-size:14px;padding:0}
+.deckrow .dn{flex:1;min-width:0;text-align:left;border:0;background:none;color:var(--ink);font:inherit;font-weight:700;padding:10px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.deckrow .dn:hover{color:var(--bee-deep)}
+.dc{width:62px;text-align:right;font-weight:800;font-variant-numeric:tabular-nums;flex:0 0 62px;white-space:nowrap}
+.deckhead .dc{font-size:11px}
+.dc.due{color:var(--ok)} .dc.new{color:#3d7bbd}
+:root[data-mode="night"] .dc.new{color:#9cc8ff}
+.panel.wide{width:min(760px,100%)}
+.browse{display:grid;gap:14px}
+.brow{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;text-align:left;border:0;background:none;color:var(--ink);padding:10px 8px;border-bottom:1px solid var(--line);border-radius:10px;cursor:pointer}
+.brow .bf{font-weight:700;font-size:16px}
+.brow .bb{font-size:13.5px;color:var(--ink2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.brow.on{background:var(--bee-soft)}
+.brow.susp{opacity:.55}
+#brows{max-height:62vh;overflow:auto;margin:0 -8px}
+.preview{background:var(--card-solid);border-radius:16px;padding:14px;box-shadow:inset 0 0 0 1.5px var(--line);font-size:16px;line-height:1.7;overflow:auto}
+.preview .q{text-align:center;font-size:calc(var(--jp-size) + 2px)}
+.preview .ans{font-family:var(--ui)}
+.preview hr,.fc .face hr{border:0;border-top:1.5px dashed var(--line2);width:100%;margin:14px 0}
+.preview img,.fc .face img{max-width:100%;height:auto}
+.revlog{margin-top:8px;font-size:13px;max-height:220px;overflow:auto}
+.revlog div{display:grid;grid-template-columns:1fr 70px 60px;gap:8px;padding:3px 0;border-bottom:1px solid var(--line)}
+.revlog .ng{color:var(--ng)} .revlog .okc{color:var(--ok)}
+.desk{display:none}
+.bedit{display:none}
+body.editing .bedit{display:block}
+@media (max-width:899px){body.editing .blist{display:none}}
+
+/* ---------- máy tính ---------- */
+@media (min-width:900px){
+  .desk{display:inline}
+  .mob{display:none}
+  .wrap{max-width:1240px;margin:0;padding:24px 40px 40px 260px}
+  .deckhead .dc{font-size:12px}
+  .tabs{left:20px;top:96px;bottom:auto;transform:none;width:204px;flex-direction:column;gap:4px;padding:10px}
+  .tabs button{flex-direction:row;justify-content:flex-start;gap:12px;padding:12px 14px;font-size:15px}
+  .tabs button b{height:auto}
+  .top{position:fixed;left:20px;top:18px;width:204px;padding:0;z-index:21}
+  .top .iconbtn{width:38px;height:38px}
+  .wrap>.card,.wrap>.h,.wrap>.secgrid,.wrap>p{max-width:none}
+  .hello .mascot{width:56px;height:56px}
+  #ankiBox{padding:22px 26px}
+  .deckrow .dn{font-size:16px}
+  .browse{grid-template-columns:minmax(320px,1fr) minmax(380px,1.25fr);align-items:start}
+  .bedit{display:block;position:sticky;top:24px;max-height:calc(100vh - 48px);overflow:auto}
+  #brows{max-height:calc(100vh - 220px)}
+  .secgrid{grid-template-columns:repeat(4,1fr)}
+  .sess{max-width:880px}
+  .deckwrap{padding:12px 32px 28px}
+  .stage{max-width:760px;width:100%;margin:0 auto}
+  .fc .face{padding:36px 44px}
+  .fc .back .ans{font-size:18px}
+  .veil{align-items:center}
+  .panel{border-radius:26px;padding:24px}
+}

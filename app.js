@@ -123,13 +123,16 @@ function bindAudio(q){const b=$('#aubtn');if(!b)return;b.onclick=()=>{if(AUQ===q
 function cloud(cls,top,w,dur,delay,op){return `<div class="cloud ${cls}" style="top:${top}%;--w:${w}px;--dur:${dur}s;animation-delay:-${delay}s;opacity:${op}"><i></i><i></i><i></i><i></i></div>`}
 const STARS=(()=>{let r='';let seed=7;const rnd=()=>(seed=(seed*9301+49297)%233280)/233280;
   for(let k=0;k<150;k++){const x=rnd()*400,y=rnd()*800,big=rnd();const rr=big>.93?1.7:big>.75?1.1:.6;r+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rr}" class="tw t${k%4}"/>`}return r})();
+const SPARK=[[8,6,1],[84,4,1.2],[76,47,.9],[22,72,.7],[50,20,.6],[92,30,.5],[12,38,.55],[64,64,.6],[36,90,.5],[88,82,.45]];
 const SKY=`<div class="sky"><div class="sky-grad"></div>
-<div class="sun"></div>
-<div class="sky-l l1">${cloud('c1',8,260,190,20,.9)}${cloud('c2',30,180,150,90,.75)}${cloud('c3',62,300,230,150,.8)}</div>
-<div class="sky-l l2">${cloud('c4',18,200,120,60,.95)}${cloud('c5',48,240,140,10,.85)}${cloud('c6',80,220,160,100,.9)}</div>
-<div class="sky-l l3">${cloud('c7',4,340,95,30,.6)}${cloud('c8',70,380,110,70,.55)}</div>
-<div class="night"><div class="neb n1"></div><div class="neb n2"></div><div class="neb n3"></div><div class="milky"></div>
-<svg class="stars" width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">${STARS}</svg><div id="shoot"></div></div></div>`;
+<div class="paint pday"></div><div class="tint"></div>
+<div class="meadow"></div>
+<img class="bfly" src="img/butterfly.webp" alt="">
+<div class="night"><div class="paint pnight"></div>
+<div class="wisp w1"></div><div class="wisp w2"></div><div class="wisp w3"></div>
+<svg class="stars" width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">${STARS}</svg>
+${SPARK.map(([x,y,k],i)=>`<img class="spark" src="img/star.webp" alt="" style="left:${x}%;top:${y}%;--k:${k};animation-delay:-${(i*0.7).toFixed(1)}s">`).join('')}
+<div id="shoot"></div></div></div>`;
 function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);SKYFX.start()}}
 const SKYFX=(()=>{
   // màu trời theo giờ (ban ngày): bình minh hồng, trưa xanh, chiều vàng cam
@@ -138,7 +141,7 @@ const SKYFX=(()=>{
   function tint(){const d=new Date(),h=d.getHours()+d.getMinutes()/60;let i=0;while(i<K.length-1&&K[i+1][0]<=h)i++;
     const A=K[i],B=K[Math.min(i+1,K.length-1)];const t=B[0]>A[0]?Math.min(1,Math.max(0,(h-A[0])/(B[0]-A[0]))):0;
     const r=document.documentElement.style;const hh=h<5?K[0]:null;r.setProperty('--day1',hh?hh[1]:mix(A[1],B[1],t));r.setProperty('--day2',hh?hh[2]:mix(A[2],B[2],t));
-    r.setProperty('--sunx',(10+80*Math.min(1,Math.max(0,(h-6)/12)))+'%');r.setProperty('--suny',(8+28*Math.abs((h-12)/6))+'%')}
+    r.setProperty('--tinto',Math.min(.5,Math.pow(Math.abs(h-12.5)/6.5,1.6)*.5).toFixed(3));r.setProperty('--sunx',(10+80*Math.min(1,Math.max(0,(h-6)/12)))+'%');r.setProperty('--suny',(8+28*Math.abs((h-12)/6))+'%')}
   // nghiêng máy / rê chuột: các lớp mây lệch nhau
   let tx=0,ty=0,cx=0,cy=0,raf=0;
   function loop(){cx+=(tx-cx)*.08;cy+=(ty-cy)*.08;const r=document.documentElement.style;r.setProperty('--px',cx.toFixed(3));r.setProperty('--py',cy.toFixed(3));raf=Math.abs(tx-cx)+Math.abs(ty-cy)>.001?requestAnimationFrame(loop):0}

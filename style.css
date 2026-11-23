@@ -606,3 +606,42 @@ body.studying .cloud{animation-duration:var(--dur)}
   .stage>.dog{--dw:58px;top:-62px}
 }
 .stage>.dog{right:auto;left:26px}.stage>.dog .bubble{right:auto;left:calc(100% - 4px);border-radius:16px 16px 16px 4px;transform-origin:bottom left}
+
+/* =================== v8: nền theo tranh của Na =================== */
+.sky-l,.sun{display:none!important}
+.paint{position:absolute;inset:-4%;background-size:cover;background-repeat:no-repeat;transform:translate3d(calc(var(--px)*-14px),calc(var(--py)*-14px),0) scale(1.04);will-change:transform}
+.pday{background-image:url(img/bg-day.webp);background-position:center top;animation:kb 60s ease-in-out infinite alternate}
+.pnight{background-image:url(img/bg-night.webp);background-position:right bottom;animation:kb 80s ease-in-out infinite alternate}
+@keyframes kb{from{background-position-x:40%}to{background-position-x:60%}}
+.pnight{animation-name:kbn}@keyframes kbn{from{background-position:85% 100%}to{background-position:100% 100%}}
+.tint{position:absolute;inset:0;background:linear-gradient(180deg,var(--day1),var(--day2));mix-blend-mode:soft-light;opacity:var(--tinto,0);transition:opacity 2s}
+.meadow{position:absolute;left:-8%;right:-8%;bottom:-2vh;height:30vh;background:url(img/meadow.webp) repeat-x center bottom/auto 100%;transform:translate3d(calc(var(--px)*-34px),calc(var(--py)*-8px),0);transform-origin:bottom center;animation:sway 7s ease-in-out infinite alternate}
+@keyframes sway{from{transform:translate3d(calc(var(--px)*-34px),0,0) skewX(-1.2deg)}to{transform:translate3d(calc(var(--px)*-34px),0,0) skewX(1.2deg)}}
+.bfly{position:absolute;width:52px;left:0;top:0;animation:bfly 26s ease-in-out infinite;transform-origin:center}
+@keyframes bfly{0%{transform:translate(8vw,38vh) rotate(-8deg) scaleX(1)}12%{transform:translate(22vw,30vh) rotate(6deg) scaleY(.8)}25%{transform:translate(40vw,36vh) rotate(-4deg)}37%{transform:translate(62vw,26vh) rotate(8deg) scaleY(.85)}50%{transform:translate(80vw,34vh) rotate(-6deg)}51%{transform:translate(80vw,34vh) scaleX(-1)}63%{transform:translate(64vw,46vh) scaleX(-1) rotate(6deg)}75%{transform:translate(44vw,40vh) scaleX(-1) scaleY(.8)}88%{transform:translate(24vw,48vh) scaleX(-1) rotate(-6deg)}99%{transform:translate(8vw,38vh) scaleX(-1)}100%{transform:translate(8vw,38vh) scaleX(1)}}
+.bfly{animation:bfly 26s ease-in-out infinite,flut .18s ease-in-out infinite alternate}
+@keyframes flut{from{filter:none}to{filter:brightness(1.05)}}
+:root[data-mode="night"] .pday,:root[data-mode="night"] .meadow,:root[data-mode="night"] .bfly,:root[data-mode="night"] .tint{opacity:0}
+.pday,.meadow,.bfly{transition:opacity 1.2s}
+.night{background:#2b3570}
+.neb,.milky{display:none}
+.stars{opacity:.55}
+.wisp{position:absolute;border-radius:50%;background:radial-gradient(circle,rgba(170,185,235,.45),rgba(170,185,235,0) 70%);filter:blur(18px);animation:wisp 50s linear infinite}
+.w1{width:70vw;height:22vh;top:12vh;left:-70vw}
+.w2{width:90vw;height:26vh;top:48vh;left:-90vw;animation-duration:70s;animation-delay:-30s}
+.w3{width:60vw;height:18vh;top:78vh;left:-60vw;animation-duration:60s;animation-delay:-12s}
+@keyframes wisp{to{transform:translateX(220vw)}}
+.spark{position:absolute;width:calc(34px*var(--k));margin:-17px 0 0 -17px;animation:spark 3.2s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(255,220,90,.7))}
+@keyframes spark{0%,100%{transform:scale(.75) rotate(0);opacity:.7}50%{transform:scale(1.1) rotate(12deg);opacity:1}}
+/* thẻ kính vẫn đọc rõ trên nền tranh */
+:root:not([data-mode="night"]) .card,:root:not([data-mode="night"]) .tool{background:rgba(255,255,255,.84)}
+.brand,.subnav{text-shadow:0 1px 8px rgba(255,255,255,.6)}
+:root[data-mode="night"] .brand{text-shadow:0 1px 8px rgba(0,0,0,.5)}
+@media (prefers-reduced-motion:reduce){.paint,.meadow,.bfly,.wisp,.spark{animation:none!important}}
+#intro{background:#9ed8f5 url(img/bg-day.webp) center top/cover}
+:root[data-mode="night"] #intro{background:#2b3570 url(img/bg-night.webp) right bottom/cover}
+.intro-sky{display:none}
+.intro-name{text-shadow:0 2px 14px rgba(255,255,255,.8)}
+:root[data-mode="night"] .intro-name{text-shadow:0 2px 14px rgba(0,0,0,.5)}
+.intro-msg{color:#4f6079}
+:root[data-mode="night"] .intro-msg{color:#bdc5ea}

@@ -899,3 +899,14 @@ body.studying .cloud{animation-duration:var(--dur)}
 .frow .fno{background:color-mix(in srgb,var(--acc) 16%,transparent);color:var(--acc)}
 .frow.here{box-shadow:0 0 0 2px var(--bee),0 6px 18px rgba(0,0,0,.12)}
 .fhere{position:absolute;top:-9px;right:14px;font-size:10.5px;font-weight:800;background:var(--bee);color:var(--bee-ink);padding:2px 8px;border-radius:999px}
+/* v53: thanh trên của bộ tự lướt thẳng hàng */
+.fvbar .starf{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;height:40px;min-width:40px}
+.fvbar .starf small{line-height:1}
+.fvbar .qc{gap:0;align-items:baseline;justify-content:center;max-width:100%;white-space:nowrap;overflow:hidden;font-size:16px}
+.fvbar .qc b{opacity:1;color:var(--ink)}
+.fvbar .qc .tiny{font-weight:700;overflow:hidden;text-overflow:ellipsis}
+.fvbar .ttl{min-width:0}
+.fvbar .ttl small{font-size:12px;font-weight:700}
+.fvbar .qc b{font-size:15px;font-weight:800}
+.fvbar .qc .tiny{font-size:15px;font-weight:700;color:var(--ink3)}
+.fvbar .qc .tiny{margin-left:4px}

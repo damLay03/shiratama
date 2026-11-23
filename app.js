@@ -378,8 +378,8 @@ function flipCfg(){S.flipAuto=Object.assign({q:4,a:4},S.flipAuto||{});return S.f
 const hasBack=c=>stripHtml(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join('')).trim()!==''||/<img/i.test(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join(''));
 function renderFlip(){return FV.view==='list'?renderFlipList():renderFlipCard()}
 function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
-  return `<div class="sbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${F.view==='list'?I.x:I.back}</button>
-   <div class="ttl"><small>${esc(F.title)} · ${L('tự lướt','flip')}</small><span class="qc">${extra}</span></div>
+  return `<div class="sbar fvbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${F.view==='list'?I.x:I.back}</button>
+   <div class="ttl">${F.view==='list'?'':`<small>${esc(F.title)}</small><span class="qc">${extra}</span>`}</div>
    <button class="iconbtn starf ${F.only?'on':''}" id="fvonly" aria-label="${L('Chỉ thẻ ★','Starred only')}" title="${L('Chỉ lướt thẻ ★','Starred only')}">★<small>${n}</small></button>
    <button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button></div>`}
 function bindFlipTop(){const F=FV;

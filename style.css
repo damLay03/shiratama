@@ -790,3 +790,9 @@ body.studying .cloud{animation-duration:var(--dur)}
 .fc .ro{font-family:var(--ui);font-size:15px;color:var(--ink3);margin-top:6px}
 @media (min-width:900px){.sess:has(.flist){max-width:880px}}
 :root[data-mode="night"] .fsh .fgo{color:var(--bee)}
+/* v49: trang Hệ thống xếp kiểu cột báo, thẻ không bị kéo dãn */
+@media (min-width:900px){
+  .sysgrid{display:block;columns:2;column-gap:18px;max-width:1200px}
+  .sysgrid>.card{break-inside:avoid;margin:0 0 18px;display:block;width:100%}
+}
+.sysgrid .jp.grow{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:clip}

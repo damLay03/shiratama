@@ -73,7 +73,17 @@ function record(q,ok,mode,ms){(S.ans[q.id]=S.ans[q.id]||[]).push({t:Date.now(),o
 function lastOk(id){const a=S.ans[id];return a&&a.length?a[a.length-1].ok:null}
 function toast(t){const d=document.createElement('div');d.className='toast';d.textContent=t;document.body.appendChild(d);setTimeout(()=>d.remove(),1800)}
 function fmtTime(s){s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function daysLeft(){return Math.max(0,Math.ceil((EXAM_DAY-Date.now())/864e5))}
+function examDay(){const v=S.examDay===undefined?'2026-12-06':S.examDay;return v?new Date(v+'T09:00:00'):null}
+function examName(){return S.examName||'JLPT N3'}
+function daysLeft(){const d=examDay();return d?Math.max(0,Math.ceil((d-Date.now())/864e5)):null}
+function examDayDialog(done){const v=document.createElement('div');v.className='veil';const cur=S.examDay===undefined?'2026-12-06':S.examDay;
+  v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:800;font-size:18px">${L('Ngày thi của anh','Your exam date')}</div><button class="iconbtn" id="edx">${I.x}</button></div>
+   <label class="lab">${L('Tên kỳ thi','Exam name')}<input class="field" id="edn" value="${esc(examName())}"></label>
+   <label class="lab">${L('Ngày thi','Exam date')}<input class="field" id="edd" type="date" value="${esc(cur)}"></label>
+   <div class="ohint">${L('Để trống ngày thì app không đếm ngược nữa.','Leave the date empty to hide the countdown.')}</div>
+   <button class="btn bee" id="eds" style="width:100%;margin-top:14px">${L('Lưu','Save')}</button></div>`;
+  document.body.appendChild(v);const q=x=>v.querySelector(x);const close=()=>v.remove();v.onclick=e=>{if(e.target===v)close()};q('#edx').onclick=close;
+  q('#eds').onclick=()=>{S.examDay=q('#edd').value||'';S.examName=q('#edn').value.trim()||'JLPT N3';save();close();done&&done()}}
 function allBy(sec){return Object.values(QI).map(x=>x.q).filter(q=>q.sec===sec)}
 function partQs(ex,p){const keys=p.key.split('+');return ex.qs.filter(q=>keys.includes(q.sec))}
 function plain(s){return String(s||'').replace(/<\/?u>/g,'').replace(/\n/g,' ')}
@@ -216,6 +226,9 @@ function sys(){
     <div class="row" style="margin-top:12px"><span class="tiny">${L('Âm lượng','Volume')}</span><input type="range" id="sfv" class="grow" min="0" max="100" value="${Math.round((S.sfxv??0.6)*100)}" style="accent-color:var(--bee-deep)"></div>
     <div class="row wrapbtn" style="margin-top:10px">${[['ok',L('Nhớ','Remembered')],['ng',L('Quên','Forgot')],['flip',L('Lật thẻ','Flip')],['woof',L('Chó ong','Shiratama')]].map(([k,l])=>`<button class="btn line sm" data-try="${k}">▶ ${l}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:8px">${L('Nếu iPhone đang gạt im lặng thì sẽ không nghe tiếng.','No sound when the iPhone silent switch is on.')}</div></div>
+   <div class="card"><div class="ot">${L('Kỳ thi','Exam')}</div>
+    <div class="kv"><span>${esc(examName())}</span><b>${examDay()?examDay().toLocaleDateString(L('vi-VN','en-GB')):L('chưa đặt','not set')}</b></div>
+    <button class="btn line" id="sexd" style="margin-top:10px">${L('Đổi ngày thi','Change exam date')}</button></div>
    <div class="card"><div class="ot">${L('Cỡ chữ trên thẻ và câu hỏi','Text size on cards and questions')}</div>
     <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><b class="tiny" style="min-width:38px;text-align:center">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
     <input type="range" id="srng" min="0" max="${SIZES.length-1}" value="${S.size}" style="width:100%;margin-top:12px;accent-color:var(--bee-deep)">
@@ -238,6 +251,7 @@ function sys(){
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
     $('#sm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook();draw()};
     $('#sp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook();draw()};
+    $('#sexd').onclick=()=>examDayDialog(draw);
     $('#srng').oninput=e=>{S.size=+e.target.value;save();applyLook();const c=e.target.closest('.card');c.querySelector('.jp').style.fontSize=SIZES[S.size]+'px';c.querySelector('b.tiny').textContent=SIZES[S.size]+'px'};
     $('#slock').onclick=()=>{if(!confirm(L('Khóa app? Lần sau phải nhập lại mã. Tiến độ học vẫn giữ nguyên.','Lock the app? You will need the code again. Progress is kept.')))return;localStorage.removeItem('shiratama-code');DATA=null;render()};
   };
@@ -380,19 +394,22 @@ function renderFlipList(){
   const groups=F.shuf?[{id:'*',name:L('Đã trộn thứ tự','Shuffled'),cards:F.items}]:F.secs.map(x=>({id:x.id,name:x.name,cards:F.items.filter(c=>c.deck===x.id)})).filter(g=>g.cards.length);
   const multi=groups.length>1;
   const row=c=>{const k=idx.get(c),T=cardTitle(c),st=isStar(c);
-    return `<div class="frow ${st?'st':''}" data-fi="${k}"><span class="fno">${k+1}</span>${T.im?`<div class="fth" data-th="${k}"></div>`:''}<div class="ftx"><div class="jp">${esc(T.t)}</div>${T.sub?`<small>${esc(T.sub)}</small>`:''}</div><button class="fstar ${st?'on':''}" data-fst="${k}" aria-label="★">★</button></div>`};
+    const here=!F.only&&!F.shuf&&F.all[pos]===c&&pos>0;
+    return `<div class="frow ${st?'st':''} ${here?'here':''}" data-fi="${k}">${here?`<span class="fhere">${L('đang dở','last here')}</span>`:''}<span class="fno">${k+1}</span>${T.im?`<div class="fth" data-th="${k}"></div>`:''}<div class="ftx"><div class="jp">${esc(T.t)}</div>${T.sub?`<small>${esc(T.sub)}</small>`:''}</div><button class="fstar ${st?'on':''}" data-fst="${k}" aria-label="★">★</button></div>`};
   full(`${flipTop(`<b>${N}</b><span class="tiny"> ${L('thẻ','cards')}${multi?` · ${groups.length} ${L('mục','sections')}`:''}</span>`)}
    <div class="flist">
-    <div class="row wrapbtn fl-act"><button class="btn bee grow" id="flgo">${F.only?L('Lướt các thẻ ★','Flip starred'):L('Lướt từ đầu','Start')}</button>${!F.only&&!F.shuf&&pos>0?`<button class="btn line grow" id="flcont">${L('Tiếp tục từ thẻ ','Continue at ')}${pos+1}</button>`:''}</div>
-    ${N?groups.map(g=>{const open=!multi||!F.col.has(g.id);const ns=g.cards.filter(isStar).length;
-      return `<section class="fsec">${multi?`<button class="fsh" data-sec="${esc(g.id)}"><span class="car">${open?'▾':'▸'}</span><b>${esc(g.name)}</b><span class="tiny">${g.cards.length} ${L('thẻ','cards')}${ns?` · ★ ${ns}`:''}</span><span class="grow"></span><span class="fgo" data-sgo="${idx.get(g.cards[0])}">${L('Lướt mục này','Flip this')} ›</span></button>`:''}
+    <div class="flhero">${dog('perch','fldog','search')}<div class="flh-k">${L('Bộ tự lướt','Flip deck')}</div><div class="flh-t">${esc(F.title)}</div>
+      <div class="flh-s">${F.all.length} ${L('thẻ','cards')}${multi?` · ${groups.length} ${L('mục','sections')}`:''} · ★ ${F.all.filter(isStar).length}${pos>0?` · ${L('đang ở thẻ','at card')} ${pos+1}`:''}</div>
+      <div class="tiny flh-h">${L('Chạm thẻ nào thì lướt từ thẻ đó. Vuốt lên trên thẻ để đánh dấu ★ chưa thuộc.','Tap any card to start there. Swipe up to ★.')}</div>
+      <div class="meter flh-m"><i style="width:${F.all.length?(pos+1)/F.all.length*100:0}%"></i></div>
+</div>
+    ${N?groups.map((g,gi)=>{const open=!multi||!F.col.has(g.id);const ns=g.cards.filter(isStar).length;
+      return `<section class="fsec c${gi%6+1}">${multi?`<button class="fsh" data-sec="${esc(g.id)}"><span class="car">${open?'▾':'▸'}</span><b>${esc(g.name)}</b><span class="tiny">${g.cards.length} ${L('thẻ','cards')}${ns?` · ★ ${ns}`:''}</span></button>`:''}
        ${open?`<div class="frows">${g.cards.map(row).join('')}</div>`:''}</section>`}).join('')
       :`<div class="card center tiny">${L('Chưa có thẻ ★ nào.','No starred cards.')}</div>`}
    </div>`);
   bindFlipTop();
   $('#fvq').onclick=()=>{FV=null;TAB='home';render()};
-  $('#flgo').onclick=()=>{F.i=0;F.view='card';F.show=false;render()};
-  if($('#flcont'))$('#flcont').onclick=()=>{F.i=Math.max(0,F.items.indexOf(F.all[pos]));F.view='card';F.show=false;render()};
   $$('[data-fi]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-fst]'))return;F.i=+b.dataset.fi;F.view='card';F.show=false;render()});
   $$('[data-fst]').forEach(b=>b.onclick=async e=>{e.stopPropagation();const c=F.items[+b.dataset.fst],on=!isStar(c);await setStar(c,on);b.classList.toggle('on',on);b.closest('.frow').classList.toggle('st',on);const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length});
   $$('[data-sec]').forEach(b=>b.onclick=e=>{if(e.target.closest('[data-sgo]')){F.i=+e.target.closest('[data-sgo]').dataset.sgo;F.view='card';F.show=false;return render()}
@@ -477,23 +494,46 @@ function lockScreen(err){
 }
 
 /* ---------- đề thi ---------- */
+function examInfo(e){const H=S.exams[e.id]||[];const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;
+  const parts=e.parts.map(p=>{const h=H.filter(x=>x.name===p.name);const best=h.length?h.reduce((m,x)=>x.c/x.n>m.c/m.n?x:m):null;return {p,best}});
+  return {n,d,parts,started:parts.some(x=>x.best)||d>0,done:parts.every(x=>x.best)}}
+const PSHORT={'moji':['Từ vựng','Vocabulary'],'bunpou+dokkai':['Ngữ pháp · Đọc','Grammar · Reading'],'choukai':['Nghe','Listening']};
+function ring(pct,size=54){const r=(size-8)/2,c=2*Math.PI*r;return `<svg class="ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><circle cx="${size/2}" cy="${size/2}" r="${r}" class="rb"/><circle cx="${size/2}" cy="${size/2}" r="${r}" class="rf" stroke-dasharray="${c}" stroke-dashoffset="${c*(1-pct)}"/><text x="50%" y="50%" dy=".35em" text-anchor="middle">${Math.round(pct*100)}%</text></svg>`}
 let EXD=null; // đề đang mở (null = danh sách đề)
 function examList(){
   const exs=examsSorted();
   if(EXD&&exs.find(e=>e.id===EXD))return examDetail(exs.find(e=>e.id===EXD));
-  const row=e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;const H=S.exams[e.id]||[];
-    const best=p=>{const h=H.filter(x=>x.name===p.name);if(!h.length)return null;return h.reduce((m,x)=>x.c/x.n>m.c/m.n?x:m)};
-    return `<button class="exrow" data-exo="${esc(e.id)}"><div class="exd"><b>${esc(exShort(e))}</b><small>JLPT N3</small></div>
-      <div class="exparts">${e.parts.map(p=>{const bb=best(p);return `<span class="expt ${bb?(bb.c/bb.n>=.6?'ok':'ng'):''}"><i>${esc(LL({'moji':['Từ vựng','Vocab'],'bunpou+dokkai':['Ngữ pháp · Đọc','Grammar · Reading'],'choukai':['Nghe','Listening']}[p.key])||partName(p))}</i><b>${bb?`${bb.c}/${bb.n}`:'–'}</b></span>`}).join('')}</div>
-      <div class="exprog"><div class="meter" style="max-width:none"><i style="width:${n?d/n*100:0}%"></i></div><small>${d?`${d}/${n} ${L('câu','Qs')}`:L('chưa làm','not started')}</small></div><span class="exgo">›</span></button>`};
+  const info=new Map(exs.map(e=>[e,examInfo(e)]));
+  const next=exs.find(e=>!info.get(e).done)||exs[0];const ni=info.get(next);const np=ni.parts.find(x=>!x.best)||ni.parts[0];
+  const doneN=exs.filter(e=>info.get(e).done).length,startedN=exs.filter(e=>info.get(e).started).length;
+  const years={};exs.forEach(e=>{const y=(e.short||'').split('/')[1]||'—';(years[y]=years[y]||[]).push(e)});
+  const card=e=>{const I_=info.get(e),[m]=(e.short||'').split('/');const pct=I_.n?I_.d/I_.n:0;
+    return `<button class="excard m${m}" data-exo="${esc(e.id)}">
+      <div class="exc-top"><div><small>${L('Tháng','Month')}</small><b>${esc(m)}</b></div>${ring(pct)}</div>
+      <div class="exc-parts">${I_.parts.map(({p,best})=>{const v=best?best.c/best.n:0;return `<div class="exc-p"><span>${esc(LL(PSHORT[p.key])||partName(p))}</span><i class="mb"><i class="${best?(v>=.6?'ok':'ng'):''}" style="width:${best?v*100:0}%"></i></i><b>${best?`${best.c}/${best.n}`:'—'}</b></div>`}).join('')}</div>
+    </button>`};
   shell(`${header()}
-  <div class="h">${L('Đề thi thật','Real tests')} · ${exs.length} ${L('đề','tests')}</div>
-  <div class="exlist">${exs.map(row).join('')}</div>
-  <div class="h">${L('Luyện theo phần (trộn câu từ mọi đề)','Practice by section (mixed)')}</div>
-  <div class="secgrid">${Object.keys(SEC).map(k=>{const qs=allBy(k);const t=qs.filter(q=>S.ans[q.id]).length;return `<button class="sec" data-prac="${k}"><div style="font-weight:800">${secName(k)}</div><div class="tiny" style="margin-top:6px">${t}/${qs.length} ${L('câu đã làm','done')}</div></button>`}).join('')}</div>
+  <div class="exhero">
+    <div class="exh-l">
+      <button class="exh-k" id="exday">${daysLeft()===null?L('Đặt ngày thi để đếm ngược','Set your exam date'):`${L('Còn','')} <b>${daysLeft()}</b> ${L('ngày tới kỳ thi','days to')} ${esc(examName())}`} <span class="edit">✎</span></button>
+      <div class="exh-t">${L('Nên làm tiếp','Up next')}: ${L('đề','test')} ${esc(exShort(next))}</div>
+      <div class="exh-s">${L('Phần','Section')} ${esc(partName(np.p))} · ${partQs(next,np.p).length} ${L('câu','Qs')} · ${np.p.min} ${L('phút','min')}</div>
+      <div class="row wrapbtn" style="margin-top:14px"><button class="btn bee" id="exgo">${L('Thi thật phần này','Start timed')}</button><button class="btn line" id="exopen">${L('Xem cả đề','Open test')}</button></div>
+    </div>
+    <div class="exh-r">
+      <div class="exh-st"><b>${doneN}<small>/${exs.length}</small></b><span>${L('đề đã làm đủ 3 phần','tests fully done')}</span></div>
+      <div class="exh-st"><b>${startedN}</b><span>${L('đề đã bắt đầu','tests started')}</span></div>
+    </div>
+  </div>
+  ${Object.keys(years).sort((a,b)=>b.localeCompare(a)).map(y=>`<section class="exyear"><h3>${esc(y)}</h3><div class="exgrid">${years[y].map(card).join('')}</div></section>`).join('')}
+  <section class="exyear"><h3>${L('Luyện theo phần','Practice by section')} <small>${L('trộn câu từ mọi đề','mixed from all tests')}</small></h3>
+  <div class="secgrid">${Object.keys(SEC).map(k=>{const qs=allBy(k);const t=qs.filter(q=>S.ans[q.id]).length;return `<button class="sec" data-prac="${k}"><div style="font-weight:800">${secName(k)}</div><div class="tiny" style="margin-top:6px">${t}/${qs.length} ${L('câu đã làm','done')}</div></button>`}).join('')}</div></section>
   `);
   $$('[data-exo]').forEach(b=>b.onclick=()=>{EXD=b.dataset.exo;S.exSel=EXD;save();examList()});
   $$('[data-prac]').forEach(b=>b.onclick=()=>startPractice(b.dataset.prac));
+  $('#exgo').onclick=()=>startExam(next,np.p,true);
+  $('#exopen').onclick=()=>{EXD=next.id;examList()};
+  $('#exday').onclick=()=>examDayDialog(examList);
 }
 function examDetail(ex){
   const hist=(S.exams[ex.id]||[]).slice(-5).reverse();

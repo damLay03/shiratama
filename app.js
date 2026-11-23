@@ -230,9 +230,12 @@ function sys(){
     <div class="kv"><span>${esc(examName())}</span><b>${examDay()?examDay().toLocaleDateString(L('vi-VN','en-GB')):L('chưa đặt','not set')}</b></div>
     <button class="btn line" id="sexd" style="margin-top:10px">${L('Đổi ngày thi','Change exam date')}</button></div>
    <div class="card"><div class="ot">${L('Cỡ chữ trên thẻ và câu hỏi','Text size on cards and questions')}</div>
-    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><b class="tiny" style="min-width:38px;text-align:center">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
+    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp szprev" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><b class="tiny" style="min-width:38px;text-align:center">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
     <input type="range" id="srng" min="0" max="${SIZES.length-1}" value="${S.size}" style="width:100%;margin-top:12px;accent-color:var(--bee-deep)">
-    <div class="tiny" style="margin-top:8px">${L(`${SIZES.length} nấc, từ ${SIZES[0]}px đến ${SIZES[SIZES.length-1]}px. Khi đang học có nút A− / A+ trong nút ⋯.`,`${SIZES.length} steps. While studying use A− / A+ in the ⋯ menu.`)}</div></div>
+    <div class="tiny" style="margin-top:8px">${L(`${SIZES.length} nấc, từ ${SIZES[0]}px đến ${SIZES[SIZES.length-1]}px. Khi đang học, bấm nút Aa ở góc trên để đổi nhanh.`,`${SIZES.length} steps. While studying, tap Aa at the top to change it.`)}</div></div>
+   <div class="card"><div class="ot">${L('Ngày mới bắt đầu lúc','New day starts at')}</div>
+    <div class="row"><button class="btn line" id="dhm">−</button><b class="grow center" id="dhv" style="font-size:22px">${dayHour()}:00</b><button class="btn line" id="dhp">+</button></div>
+    <div class="tiny" style="margin-top:8px">${L('Đến giờ này app mới tính sang ngày mới: mở thẻ mới và đếm lại số thẻ ôn trong ngày. Hay thức khuya thì để muộn hơn.','At this hour the app rolls over to a new day: new cards open and daily counts reset. Night owls can set it later.')}</div></div>
    <div class="card"><div class="ot">${L('Dữ liệu','Data')}</div>
     <div class="kv"><span>${L('Bộ thẻ Anki cập nhật','Anki collection updated')}</span><b>${ls.get('shiratama-colv')?new Date(ls.get('shiratama-colv')*1000).toLocaleDateString(L('vi-VN','en-GB')):'—'}</b></div>
     <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này, đồng thời được gửi lên kho chung. Điện thoại và máy tính nhập cùng mã sẽ thấy cùng tiến độ.','Progress is saved here and synced. Devices with the same code share progress.')}</div>
@@ -252,6 +255,7 @@ function sys(){
     $('#sm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook();draw()};
     $('#sp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook();draw()};
     $('#sexd').onclick=()=>examDayDialog(draw);
+    const dh=d=>{S.dayHour=(dayHour()+d+24)%24;save();$('#dhv').textContent=S.dayHour+':00'};$('#dhm').onclick=()=>dh(-1);$('#dhp').onclick=()=>dh(1);
     $('#srng').oninput=e=>{S.size=+e.target.value;save();applyLook();const c=e.target.closest('.card');c.querySelector('.jp').style.fontSize=SIZES[S.size]+'px';c.querySelector('b.tiny').textContent=SIZES[S.size]+'px'};
     $('#slock').onclick=()=>{if(!confirm(L('Khóa app? Lần sau phải nhập lại mã. Tiến độ học vẫn giữ nguyên.','Lock the app? You will need the code again. Progress is kept.')))return;localStorage.removeItem('shiratama-code');DATA=null;render()};
   };
@@ -259,7 +263,7 @@ function sys(){
 }
 
 /* ---------- v46+: deck tự lướt, thanh tự lướt, ảnh trong thẻ ---------- */
-const GRADE_OF={again:1,hard:2,good:3,easy:4};
+const GRADE_OF={again:1,hard:3,good:3,easy:3};
 const STAR='star';
 let FV=null;
 
@@ -268,13 +272,20 @@ function modeOf(name,decks){const by={};decks.forEach(d=>by[d.name]=d);const p=n
   for(let i=p.length;i>0;i--){const d=by[p.slice(0,i).join('::')];if(d&&d.mode)return d.mode}return 'srs'}
 function flipIds(decks){const s=new Set();decks.forEach(d=>{if(modeOf(d.name,decks)==='flip')s.add(d.id)});return s}
 
+/* ---- nút cỡ chữ (mọi màn học thẻ) ---- */
+function sizeBtnHTML(){return `<div class="szw"><button class="iconbtn szb" id="szb" aria-label="${L('Cỡ chữ','Text size')}" title="${L('Cỡ chữ','Text size')}"><span>A</span><span>a</span></button>
+  <div class="szpop" id="szpop"><button data-sz="-1" aria-label="A−">A−</button><b id="szv">${SIZES[S.size]}px</b><button data-sz="1" aria-label="A+">A+</button></div></div>`}
+function bindSizeBtn(after){const b=$('#szb'),p=$('#szpop');if(!b)return;
+  b.onclick=e=>{e.stopPropagation();p.classList.toggle('open')};p.addEventListener('pointerdown',e=>e.stopPropagation());
+  p.onclick=e=>{e.stopPropagation();const k=e.target.closest('[data-sz]');if(!k)return;S.size=Math.max(0,Math.min(SIZES.length-1,S.size+ +k.dataset.sz));save();applyLook();$('#szv').textContent=SIZES[S.size]+'px';if(after)after()};
+  document.addEventListener('pointerdown',function f(ev){const q=$('#szpop');if(!q){document.removeEventListener('pointerdown',f);return}if(!ev.target.closest('.szw'))q.classList.remove('open')})}
 /* ---- thanh tự lướt (giống Anki) ---- */
 function autoBarHTML(on,q,a,act,o={}){
   const st=(k,lab,v)=>`<div class="ab-s"><span>${lab}</span><button data-ab="${k}-" aria-label="−">−</button><b data-abv="${k}">${v}s</b><button data-ab="${k}+" aria-label="+">+</button></div>`;
   return `<div class="autobar" id="abar" ${S.autoBar===0&&!o.always?'hidden':''}>
     <button class="ab-play ${on?'on':''}" data-ab="play">${on?I.pause:I.play}<span>${on?L('Đang lướt','Running'):L('Tự lướt','Auto')}</span></button>
     ${st('q',L('Mặt trước','Front'),q)+st('a',L('Mặt sau','Back'),a)}
-    ${o.grade?`<div class="ab-g"><span>${L('Tự bấm','Auto grade')}</span>${[['again',L('Quên','Again')],['hard',L('Khó','Hard')],['good',L('Nhớ','Good')],['easy',L('Dễ','Easy')],['remind',L('Tự chấm','Manual')]].map(([k,l])=>`<button data-act="${k}" class="${act===k?'on':''}">${l}</button>`).join('')}</div>`:''}
+    ${o.grade?`<div class="ab-g"><span>${L('Tự bấm','Auto grade')}</span>${[['again',L('Quên','Again')],['good',L('Nhớ','Good')],['remind',L('Tự chấm','Manual')]].map(([k,l])=>`<button data-act="${k}" class="${(act==='hard'||act==='easy'?'good':act)===k?'on':''}">${l}</button>`).join('')}</div>`:''}
   </div>`}
 function bindAutoBar(bar,ctl){if(!bar)return;
   bar.addEventListener('pointerdown',e=>e.stopPropagation());
@@ -385,7 +396,7 @@ function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
   return `<div class="sbar fvbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${F.view==='list'?I.x:I.back}</button>
    <div class="ttl">${F.view==='list'?'':`<small>${esc(F.title)}</small><span class="qc">${extra}</span>`}</div>
    <button class="iconbtn starf ${F.only?'on':''}" id="fvonly" aria-label="${L('Chỉ thẻ ★','Starred only')}" title="${L('Chỉ lướt thẻ ★','Starred only')}">★<small>${n}</small></button>
-   <button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button></div>`}
+   ${F.view==='list'?'':sizeBtnHTML()}<button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button></div>`}
 function bindFlipTop(){const F=FV;
   $('#fvonly').onclick=()=>{if(!F.only&&!F.all.some(isStar)){toast(L('Chưa có thẻ ★ nào','No starred cards yet'));return}F.only=!F.only;S.flipOnly=S.flipOnly||{};S.flipOnly[F.name]=F.only;save();F.i=0;flipItems();render()};
   $('#fvsh').onclick=()=>{F.shuf=!F.shuf;F.shufOrder=F.shuf?shuffle(F.all):null;F.i=0;flipItems();toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));render()}}
@@ -431,11 +442,11 @@ function renderFlipCard(){
   full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}${sec?` · ${esc(sec)}`:''}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
    ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
-   <div class="deckwrap flipwrap" id="akwrap"><div class="stage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
-     <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+   <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
+     <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg><span class="fmore" id="fmore"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></div>
 </div>`);
   ANKI.hydrate($('#fc'));
-  bindFlipTop();
+  bindFlipTop();bindSizeBtn(()=>setTimeout(moreHint,30));
   const ring=sec=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
   const unring=()=>{const r=$('#aring');if(r)r.classList.remove('run')};
   const go=k=>{clearTimeout(F.at);if(k>=N){F.auto=false;F.view='list';toast(L('Hết lượt lướt','End of deck'));render();return}if(k<0)return;
@@ -458,7 +469,31 @@ function renderFlipCard(){
     SFX.play(dir==='u'?'ok':'flip');setTimeout(then,220)};
   const toNext=()=>{if(F.i>=N-1)return next();fly('l',next)},toPrev=()=>{if(!F.i){snap();return}fly('r',prev)};
   const snap=()=>{fc.style.transition='transform .25s cubic-bezier(.3,1.5,.5,1)';fc.style.transform=F.show?'rotateY(180deg)':''};
-  stage.addEventListener('pointerdown',e=>{if(busy||e.target.closest('a,button,input'))return;sx=e.clientX;sy=e.clientY;down=true;fc.style.transition='none';stage.setPointerCapture(e.pointerId)});
+  const face=()=>fc.querySelector(F.show?'.back':'.front');
+  const atEnd=el=>el.scrollTop+el.clientHeight>=el.scrollHeight-3;
+  const moreHint=()=>{const el=face(),m=$('#fmore');if(!el||!m)return;m.classList.toggle('on',el.scrollHeight>el.clientHeight+4&&!atEnd(el))};
+  fc.querySelectorAll('.face').forEach(f=>f.addEventListener('scroll',moreHint,{passive:true}));
+  setTimeout(moreHint,60);setTimeout(moreHint,600);fc.addEventListener('transitionend',moreHint);
+  // cảm ứng: kéo dọc = cuộn nội dung thẻ; hết nội dung mới tính vuốt lên ★; kéo ngang = chuyển thẻ
+  let T=null,vel=0,raf=0;
+  const glide=el=>{cancelAnimationFrame(raf);const step=()=>{if(Math.abs(vel)<.3)return;el.scrollTop+=vel;vel*=.94;raf=requestAnimationFrame(step)};raf=requestAnimationFrame(step)};
+  stage.addEventListener('touchstart',e=>{if(busy||e.touches.length>1||e.target.closest('a,button,input')){T=null;return}cancelAnimationFrame(raf);const t=e.touches[0],el=face();
+    T={x:t.clientX,y:t.clientY,ly:t.clientY,lt:performance.now(),mode:null,el,st:el.scrollTop,end0:atEnd(el)};fc.style.transition='none'},{passive:true});
+  stage.addEventListener('touchmove',e=>{if(!T)return;const t=e.touches[0],dx=t.clientX-T.x,dy=t.clientY-T.y;
+    if(!T.mode){if(Math.abs(dx)<8&&Math.abs(dy)<8)return;
+      T.mode=Math.abs(dx)>Math.abs(dy)?'h':(dy<0&&T.end0?'u':'v')}
+    e.preventDefault();
+    if(T.mode==='v'){const now=performance.now();T.el.scrollTop=T.st-dy;vel=(T.ly-t.clientY)/Math.max(1,now-T.lt)*16;T.ly=t.clientY;T.lt=now;return}
+    if(T.mode==='u'){fc.style.transform=`translateY(${Math.min(0,dy)}px)${ry()}`;return}
+    fc.style.transform=`translateX(${dx}px) rotate(${dx/26}deg)${ry()}`;fc.classList.toggle('tint-r',dx>50);fc.classList.toggle('tint-l',dx<-50)},{passive:false});
+  stage.addEventListener('touchend',e=>{if(!T)return;const t=e.changedTouches[0],dx=t.clientX-T.x,dy=t.clientY-T.y,m=T.mode,el=T.el;T=null;fc.classList.remove('tint-r','tint-l');
+    if(m==='v'){snap();glide(el);return}
+    if(m==='u'){if(-dy>70){const on=!isStar(it);setStar(it,on).then(()=>{const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length});toast(on?L('Đã đánh dấu ★ chưa thuộc','Starred'):L('Đã bỏ ★','Unstarred'));return fly('u',()=>go(F.i+1))}return snap()}
+    if(m==='h'){if(Math.abs(dx)>60)return dx<0?toNext():toPrev();return snap()}
+    snap();if(!two){const r=stage.getBoundingClientRect();return t.clientX>r.left+r.width/2?toNext():toPrev()}
+    flip();setTimeout(moreHint,450)});
+  stage.addEventListener('touchcancel',()=>{T=null;snap()});
+  stage.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'||busy||e.target.closest('a,button,input'))return;sx=e.clientX;sy=e.clientY;down=true;fc.style.transition='none';stage.setPointerCapture(e.pointerId)});
   stage.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)<6&&Math.abs(dy)<6)return;
     const up=-dy>Math.abs(dx);fc.style.transform=up?`translateY(${Math.min(0,dy)}px)${ry()}`:`translateX(${dx}px) rotate(${dx/26}deg)${ry()}`;
     fc.classList.toggle('tint-r',!up&&dx>50);fc.classList.toggle('tint-l',!up&&dx<-50)});
@@ -467,7 +502,7 @@ function renderFlipCard(){
     if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy))return dx<0?toNext():toPrev();
     snap();if(Math.abs(dx)>12||Math.abs(dy)>12)return;
     if(!two){const r=stage.getBoundingClientRect();return e.clientX>r.left+r.width/2?toNext():toPrev()}
-    flip()};
+    flip();setTimeout(moreHint,450)};
   stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',()=>{down=false;snap()});
   F.key=e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;
     if(e.key==='ArrowRight'){e.preventDefault();toNext()}else if(e.key==='ArrowLeft'){e.preventDefault();toPrev()}
@@ -664,7 +699,8 @@ function resultScreen(s){
 let ST=null; // {decks, cards}
 async function ankiState(force){if(!window.ANKI)return {decks:[],cards:[]};if(ST&&!force)return ST;const [decks,cards]=await Promise.all([ANKI.all('decks'),ANKI.all('cards')]);ST={decks,cards};return ST}
 const dropState=()=>{ST=null};
-function dayEnd(){const d=new Date();const e=new Date(d);e.setHours(4,0,0,0);if(e<=d)e.setDate(e.getDate()+1);return e.getTime()}
+function dayHour(){const h=+S.dayHour;return Number.isInteger(h)&&h>=0&&h<24?h:4}
+function dayEnd(){const d=new Date();const e=new Date(d);e.setHours(dayHour(),0,0,0);if(e<=d)e.setDate(e.getDate()+1);return e.getTime()}
 const dayKey=()=>new Date(dayEnd()-864e5).toDateString();
 function isDue(c,now,de){if(c.card.state===0)return false;const t=new Date(c.card.due).getTime();return c.card.state===2?t<=de:t<=now+20*60000}
 
@@ -817,7 +853,7 @@ async function deckOptions(name){
      ${H(L('Bấm ▶ Tự lướt trên thanh ngay dưới thẻ khi đang học. App tự lật thẻ và tự chuyển thẻ theo số giây dưới đây.','Turn on while studying from the ⋯ button.'))}
      <label class="lab">${L('Mặt trước hiện bao nhiêu giây rồi tự lật','Seconds before showing the answer')}<input class="field" id="oaq" type="number" min="1" value="${c.autoQ}"></label>
      <label class="lab">${L('Mặt sau hiện bao nhiêu giây','Seconds to show the answer')}<input class="field" id="oaa" type="number" min="1" value="${c.autoA}"></label>
-     <label class="lab">${L('Hết giờ mặt sau mà anh chưa chấm thì','When time runs out')}${opt('oact',c.autoAct,[['again',L('Tính là Quên','Count as Again')],['hard',L('Tính là Khó','Count as Hard')],['good',L('Tính là Nhớ','Count as Good')],['easy',L('Tính là Dễ','Count as Easy')],['remind',L('Chỉ nhắc, chờ anh chấm','Just remind me')]])}</label></div>
+     <label class="lab">${L('Hết giờ mặt sau mà anh chưa chấm thì','When time runs out')}${opt('oact',c.autoAct==='hard'||c.autoAct==='easy'?'good':c.autoAct,[['again',L('Tính là Quên','Count as Again')],['good',L('Tính là Nhớ','Count as Good')],['remind',L('Chỉ nhắc, chờ anh chấm','Just remind me')]])}</label></div>
    <div class="osec"><div class="ot">${L('Cách tính lịch ôn','Scheduling')}</div>
      <label class="lab">${L('Muốn nhớ được bao nhiêu phần trăm thẻ','Target memory rate')} <b id="oretv">${Math.round(c.ret*100)}%</b><input type="range" id="oret" min="70" max="99" value="${Math.round(c.ret*100)}"></label>
      ${H(L('Cao hơn thì ôn dày hơn, nhớ chắc hơn nhưng mỗi ngày nhiều thẻ hơn. 90% là mức Anki khuyên dùng.','Higher means more reviews per day but better memory. 90% is the usual choice.'))}
@@ -1112,7 +1148,7 @@ function renderAnki(){
   const done=AK.a+AK.g,tot=done+left;
   full(`<div class="sbar"><button class="iconbtn" id="akq" aria-label="${L('Dừng','Stop')}">${I.x}</button>
      <div class="ttl">${AK.title?`<small>${esc(AK.title)}</small>`:''}<span class="qc"><b class="cn ${it.card.state===0?'cur':''}">${cnt.n}</b><b class="cl ${it.card.state===1||it.card.state===3?'cur':''}">${cnt.l}</b><b class="cr ${it.card.state===2?'cur':''}">${cnt.r}</b>${P.showTimer?`<span id="aktm">0:00</span>`:''}</span></div>
-     <button class="iconbtn" id="akundo" aria-label="${L('Hoàn tác','Undo')}" ${AK.hist.length?'':'disabled'}>${I.undo}</button>
+     ${sizeBtnHTML()}<button class="iconbtn" id="akundo" aria-label="${L('Hoàn tác','Undo')}" ${AK.hist.length?'':'disabled'}>${I.undo}</button>
      <button class="iconbtn ${AK.auto?'on':''}" id="akmenu" aria-label="${L('Tùy chọn','More')}">${I.dots}</button>
      <div class="akpop" id="akpop">
        <button id="akauto" class="${S.autoBar!==0?'on':''}">${I.play}<span>${L('Thanh tự lướt','Auto advance bar')}<small>${S.autoBar!==0?L('Đang hiện, bấm để ẩn','Shown, tap to hide'):L('Đang ẩn, bấm để hiện','Hidden, tap to show')}</small></span></button>
@@ -1128,7 +1164,7 @@ function renderAnki(){
   {const d=$('#akdog'),A=AK.dogAct;if(d&&A&&Date.now()-A[1]<500){const e=(Date.now()-A[1])/1000;d.querySelector('.sf').style.animationDelay=-e+'s';d._s=setTimeout(()=>{d.classList.remove('yay','sad');d.querySelector('.sf').style.animationDelay=''},(A[0]==='yay'?900:1300)-e*1000)}}
   const shown0=Date.now();clearInterval(AK.tmr);if(P.showTimer)AK.tmr=setInterval(()=>{const e=$('#aktm');if(!e)return clearInterval(AK.tmr);e.textContent=fmtTime(Math.min(P.capSec,(Date.now()-shown0)/1000))},1000);
   $('#akq').onclick=()=>{clearInterval(AK.tmr);clearTimeout(AK.at);AK=null;dropState();TAB='home';render()};
-  $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};
+  $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};bindSizeBtn();
   $('#aksm').onclick=e=>{e.stopPropagation();S.size=Math.max(0,S.size-1);save();applyLook()};
   $('#aksp').onclick=e=>{e.stopPropagation();S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()};
   $('#akmu').onclick=e=>{MUSIC.toggle();e.currentTarget.classList.toggle('on',MUSIC.on)};

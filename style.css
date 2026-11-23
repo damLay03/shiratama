@@ -956,3 +956,4 @@ body.studying .cloud{animation-duration:var(--dur)}
 :root[data-mode="night"] .gc-n1{--gc:#a98bf0}
 .gc-p{word-break:keep-all;overflow-wrap:anywhere}
 @media (max-width:520px){.gc-p{font-size:calc(var(--jp-size) * 1.45)}.fc .face:has(.gc){padding:16px 14px}}
+.gc-g+.gc-g{margin-top:2px;padding-top:0;border-top:0}

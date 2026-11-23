@@ -910,3 +910,8 @@ body.studying .cloud{animation-duration:var(--dur)}
 .fvbar .qc b{font-size:15px;font-weight:800}
 .fvbar .qc .tiny{font-size:15px;font-weight:700;color:var(--ink3)}
 .fvbar .qc .tiny{margin-left:4px}
+/* v54: thẻ chỉ có ảnh thì không có nền thẻ; ★ chỉ là dấu nhỏ, không phải nút */
+.fc.imgonly .face{background:none;box-shadow:none;padding:0;overflow:visible}
+.fc.imgonly .face .gt+img{border-radius:18px;box-shadow:0 18px 40px -18px rgba(0,0,0,.55)}
+.starmark{display:none;position:absolute;top:10px;right:14px;z-index:5;width:30px;height:30px;border-radius:50%;place-items:center;background:var(--bee);color:var(--bee-ink);font-size:16px;box-shadow:0 4px 12px rgba(0,0,0,.2);pointer-events:none}
+.starmark.on{display:grid;animation:pop .3s}

@@ -425,8 +425,8 @@ function renderFlipCard(){
   full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}${sec?` · ${esc(sec)}`:''}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
    ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
-   <div class="deckwrap flipwrap" id="akwrap"><div class="stage" id="stage"><div class="fc ${F.show?'flip':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
-     <button class="starbtn ${isStar(it)?'on':''}" id="fvstar" aria-label="${L('Đánh dấu chưa thuộc','Star')}">★</button><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+   <div class="deckwrap flipwrap" id="akwrap"><div class="stage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
+     <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
 </div>`);
   ANKI.hydrate($('#fc'));
   bindFlipTop();
@@ -444,8 +444,6 @@ function renderFlipCard(){
   bindAutoBar($('#abar'),{get on(){return F.auto},set on(v){F.auto=v;arm()},get q(){return cfg.q},get a(){return cfg.a},
     set(k,v){if(k==='autoQ')cfg.q=v;else cfg.a=v;save()}});
   $('#fvq').onclick=()=>{clearTimeout(F.at);F.auto=false;F.view='list';render()};
-  $('#fvstar').onclick=e=>{e.stopPropagation();star(false)};
-  $('#fvstar').onpointerdown=e=>e.stopPropagation();
   // quẹt: thẻ chạy theo tay rồi bay đi
   const stage=$('#stage'),fc=$('#fc');let sx=0,sy=0,down=false,busy=false;
   const ry=()=>F.show?' rotateY(180deg)':'';

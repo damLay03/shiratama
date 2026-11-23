@@ -96,7 +96,10 @@ const I={
 };
 
 /* ---------- Shiratama (chó ong của Na) ---------- */
-function dog(cls,id){return `<div class="dog ${cls||''}" ${id?`id="${id}"`:''} aria-hidden="true"><img class="wl" src="img/dog-wl.webp" alt=""><img class="wr" src="img/dog-wr.webp" alt=""><img class="bd" src="img/dog-body.webp" alt=""></div>`}
+const SPRNAME={mini:'logo',perch:'home',buddy:'study',fb:'intro'};
+function dog(cls,id,name){name=name||SPRNAME[(cls||'').split(' ')[0]]||'intro';return `<div class="dog spr sp-${name} ${cls||''}" ${id?`id="${id}"`:''} aria-hidden="true"><i class="sf"></i></div>`}
+// chạy một đoạn khung hình (ví dụ chó nói, chó vui), xong thì về dáng thường
+function sprAct(el,cls,ms){if(!el)return;el.classList.remove('talk','yay','sad');void el.offsetWidth;el.classList.add(cls);clearTimeout(el._s);el._s=setTimeout(()=>el.classList.remove(cls),ms||1800)}
 function dogSay(el,txt,ms){if(!el)return;let b=el.querySelector('.bubble');if(!b){b=document.createElement('div');b.className='bubble';el.appendChild(b)}b.textContent=txt;b.classList.remove('show');void b.offsetWidth;b.classList.add('show');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('show'),ms||3200)}
 function dogDo(el,act){if(!el)return;el.classList.remove('hop','tilt','buzz');void el.offsetWidth;el.classList.add(act);clearTimeout(el._d);el._d=setTimeout(()=>el.classList.remove(act),800)}
 const DOG_LINES=()=>[L('Gâu! Học tiếp nha anh.','Woof! Let’s keep going.'),L('Từ nào khó cứ để em canh cho.','I’ll keep an eye on the hard ones.'),L('Uống miếng nước rồi học tiếp nè.','Sip some water, then back to it.'),L('Em bay vòng vòng chờ anh đó.','I’m buzzing around waiting for you.'),L('Một thẻ một thẻ là xong hết thôi.','One card at a time.'),L('Hôm nay trời đẹp ghê.','Lovely sky today.')];
@@ -233,7 +236,7 @@ function render(){
 
 /* ---------- lock ---------- */
 function lockScreen(err){
-  shell(`${header()}<div class="card center" style="margin-top:24px">${dog('fly big')}
+  shell(`${header()}<div class="card center" style="margin-top:24px">${dog('big','','wave')}
   <p style="font-size:22px;font-weight:800;margin:0 0 4px">${L('Chào anh','Welcome')}</p><p class="muted small" style="margin:0 0 16px">${L('Nhập mã để mở bộ đề. Mỗi máy chỉ cần nhập một lần.','Enter your code to unlock the tests. Once per device.')}</p>
   <input class="field" id="code" placeholder="${L('Mã của anh','Your code')}" autocomplete="off" autocapitalize="off" spellcheck="false">
   ${err?`<p class="small" style="color:var(--ng)">${esc(err)}</p>`:''}
@@ -448,7 +451,7 @@ async function ankiBox(){
    ${st.cards.length?`<div class="deckhead"><span class="grow">Deck</span><span class="dc new">${L('Mới','New')}</span><span class="dc lrn">${L('Học','Learn')}</span><span class="dc due">${L('Ôn','Due')}</span><span style="width:34px"></span></div>
    <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}</div>`;
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
-  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
+  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
   $$('[data-tw]').forEach(b=>b.onclick=()=>{S.collapsed=S.collapsed||{};S.collapsed[b.dataset.tw]=!S.collapsed[b.dataset.tw];save();ankiBox()});
   $$('[data-study]').forEach(b=>b.onclick=()=>startAnki(nodeSet(st,tree,b.dataset.study),b.dataset.study));
@@ -660,7 +663,7 @@ async function browse(){
     const f=SORTS[BR.sort]||SORTS.created;list.sort((a,b)=>{const x=f(a),y=f(b);const r=typeof x==='string'?x.localeCompare(y):x-y;return BR.desc?-r:r});
     const el=$('#brows');if(!el)return;
     $('#bcount').textContent=L(`${list.length} thẻ`,`${list.length} cards`)+(list.length>BR.lim?L(` · hiện ${BR.lim} thẻ đầu`,` · showing first ${BR.lim}`):'');
-    el.innerHTML=list.slice(0,BR.lim).map(c=>{const [f,b]=fieldsOf(c);const due=c.card.state===0?L('mới','new'):new Date(c.card.due).toLocaleDateString(L('vi-VN','en-GB'));
+    el.innerHTML=(list.length?'':`<div class="empty">${dog('','','search')}${L('Không tìm thấy thẻ nào.','No cards found.')}</div>`)+list.slice(0,BR.lim).map(c=>{const [f,b]=fieldsOf(c);const due=c.card.state===0?L('mới','new'):new Date(c.card.due).toLocaleDateString(L('vi-VN','en-GB'));
       return `<div class="brow ${BR.sel===c.id?'on':''} ${c.susp?'susp':''}" data-id="${esc(c.id)}">${pick?`<input type="checkbox" class="bpk" ${pick.has(c.id)?'checked':''}>`:''}<div class="bt"><span class="bf jp">${esc(stripHtml(f).slice(0,70))}</span><span class="bb">${esc(stripHtml(b).slice(0,90))}</span><span class="tiny">${esc(deckName[c.deck]||'')} · ${due}${c.susp?' · '+L('tạm ẩn','suspended'):''}</span></div></div>`}).join('')+(list.length>BR.lim?`<button class="btn line" id="bmore" style="width:100%;margin-top:8px">${L('Hiện thêm','Show more')}</button>`:'');
     $$('.brow').forEach(b=>b.onclick=e=>{const id=b.dataset.id;
       if(pick){if(pick.has(id))pick.delete(id);else pick.add(id);const cb=b.querySelector('.bpk');cb.checked=pick.has(id);$('#bpn').textContent=L(`${pick.size} đã chọn`,`${pick.size} selected`);return}
@@ -790,7 +793,7 @@ function schedule(card,g,P){
 const revType=s=>s===2?1:s===3?2:0;
 function renderAnki(){
   const it=AK.list[AK.i];
-  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('fly big')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};return}
+  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('big','','done')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};return}
   const deck=AK.decks.find(d=>d.id===it.deck);const P=presetOf(deck);
   const left=AK.list.length-AK.i;
   const cnt={n:0,l:0,r:0};AK.list.slice(AK.i).forEach(c=>{const s=c.card.state;if(s===0)cnt.n++;else if(s===2)cnt.r++;else cnt.l++});
@@ -806,9 +809,10 @@ function renderAnki(){
        <button id="akedit">${I.pen}<span>${L('Sửa thẻ này','Edit this card')}</span></button>
      </div></div>
    <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
-   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy','akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
+  {const d=$('#akdog'),A=AK.dogAct;if(d&&A&&Date.now()-A[1]<500){const e=(Date.now()-A[1])/1000;d.querySelector('.sf').style.animationDelay=-e+'s';d._s=setTimeout(()=>{d.classList.remove('yay','sad');d.querySelector('.sf').style.animationDelay=''},(A[0]==='yay'?900:1300)-e*1000)}}
   const shown0=Date.now();clearInterval(AK.tmr);if(P.showTimer)AK.tmr=setInterval(()=>{const e=$('#aktm');if(!e)return clearInterval(AK.tmr);e.textContent=fmtTime(Math.min(P.capSec,(Date.now()-shown0)/1000))},1000);
   $('#akq').onclick=()=>{clearInterval(AK.tmr);clearTimeout(AK.at);AK=null;dropState();TAB='home';render()};
   $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};
@@ -826,7 +830,7 @@ function renderAnki(){
   const flip=()=>{AK.show=true;SFX.play('flip');dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akwrap').classList.add('shown');
     clearTimeout(AK.at);if(AK.auto){ring(P.autoA);AK.at=setTimeout(()=>{if(!AK||AK.list[AK.i]!==it)return;if(P.autoAct==='remind'){SFX.play('tap');dogSay($('#akdog'),L('Anh ơi, chấm thẻ này nè','Time to grade this one'),2500)}else grade(P.autoAct==='good'?3:1)},P.autoA*1000)}};
   clearTimeout(AK.at);if(AK.auto){ring(P.autoQ);AK.at=setTimeout(()=>{if(AK&&AK.list[AK.i]===it&&!AK.show)flip()},P.autoQ*1000)}
-  const grade=async(g)=>{if(busy)return;busy=true;clearTimeout(AK.at);glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
+  const grade=async(g)=>{if(busy)return;busy=true;clearTimeout(AK.at);glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');sprAct($('#akdog'),g===3?'yay':'sad',g===3?900:1300);AK.dogAct=[g===3?'yay':'sad',Date.now()];fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
     const prev=JSON.parse(JSON.stringify(it));const pos=AK.i;const was=it.card.state;const ms=Math.min(P.capSec*1000,Date.now()-shown0);
     const D=daily();const dsnap=JSON.parse(JSON.stringify(D));
     if(hasF)it.card=schedule(it.card,g,P);
@@ -901,8 +905,8 @@ function hist(vals,edges,labelFn,color){const cnt=new Array(edges.length).fill(0
   const tot=vals.length||1;return bars(cnt.map((c,i)=>({label:labelFn(i),vals:[c],tip:`${labelFn(i)}: ${c} ${L('thẻ','cards')} (${pct(c,tot)})`})),[color],{xlabels:[labelFn(0),labelFn(Math.floor(edges.length/2)),labelFn(edges.length-1)]})}
 
 async function stats(){
-  shell(`${header()}<div class="card"><div class="row wrapbtn stctl"><select class="field sm" id="sdeck"></select>
-    <div class="seg sm" id="srange">${[['m1',L('1 tháng','1 month')],['m3',L('3 tháng','3 months')],['y1',L('1 năm','1 year')],['all',L('Tất cả','All')]].map(([k,l])=>`<button data-r="${k}" class="${STA.range===k?'on':''}">${l}</button>`).join('')}</div></div></div>
+  shell(`${header()}<div class="card"><div class="sthead">${dog('','','read')}<div class="row wrapbtn stctl grow"><select class="field sm" id="sdeck"></select>
+    <div class="seg sm" id="srange">${[['m1',L('1 tháng','1 month')],['m3',L('3 tháng','3 months')],['y1',L('1 năm','1 year')],['all',L('Tất cả','All')]].map(([k,l])=>`<button data-r="${k}" class="${STA.range===k?'on':''}">${l}</button>`).join('')}</div></div></div></div>
     <div id="stbody"><div class="card tiny">${L('Đang tính…','Computing…')}</div></div>`);
   const st=await ankiState();const tree=deckTree(st);
   const names=Object.keys(tree.nodes).sort((a,b)=>a.localeCompare(b));
@@ -1016,7 +1020,7 @@ function examStats(){
   shell(`${header()}
   ${weak.length?`<div class="card"><div class="tiny">${L('Yếu nhất hiện tại','Weakest right now')}</div>${weak.map(([k,r])=>`<div class="row" style="margin-top:8px"><div class="grow" style="font-size:16px">${esc(k)}</div><b style="color:var(--ng)">${Math.round(r.c/r.n*100)}%</b></div>`).join('')}</div>`:''}
   <div class="h">${L('Tỉ lệ đúng theo dạng câu','Accuracy by question type')}</div>
-  <div class="card">${list.length?list.map(([k,r])=>`<div class="list-item"><div class="grow" style="font-size:15px">${esc(k)}</div><div class="meter ${r.c/r.n<.6?'low':''}" style="max-width:100px"><i style="width:${r.c/r.n*100}%"></i></div><b style="min-width:48px;text-align:right">${r.c}/${r.n}</b></div>`).join(''):`<div class="empty"><img class="mascot s" src="img/mark.webp" alt="">${L('Làm vài câu là ở đây có số liệu.','Answer a few questions to see numbers here.')}</div>`}</div>
+  <div class="card">${list.length?list.map(([k,r])=>`<div class="list-item"><div class="grow" style="font-size:15px">${esc(k)}</div><div class="meter ${r.c/r.n<.6?'low':''}" style="max-width:100px"><i style="width:${r.c/r.n*100}%"></i></div><b style="min-width:48px;text-align:right">${r.c}/${r.n}</b></div>`).join(''):`<div class="empty">${dog('','','read')}${L('Làm vài câu là ở đây có số liệu.','Answer a few questions to see numbers here.')}</div>`}</div>
   <div class="h">${L('Điểm ngữ pháp, từ vựng đang sai','Grammar and words you keep missing')}</div>
   <div class="card">${Object.keys(tags).length?`<div class="row" style="flex-wrap:wrap;gap:8px">${Object.keys(tags).map(t=>`<span class="chip jp">${esc(t)}</span>`).join('')}</div>`:`<div class="tiny">${L('Chưa có.','None yet.')}</div>`}</div>
   <div class="h">${L('Dữ liệu','Data')}</div>
@@ -1099,7 +1103,7 @@ document.addEventListener('pointerdown',e=>{const b=e.target.closest('button,.dn
 /* ---------- bộ thẻ dựng sẵn ---------- */
 async function openBundle(code){
   if(!window.ANKI)return;
-  try{const r=await ANKI.loadBundle(code,t=>{ensureSky();const it=document.getElementById('intro');if(it){const m=it.querySelector('.intro-msg');if(m)m.textContent=t}else $('#app').innerHTML=`<div class="wrap"><div class="card center" style="margin-top:30vh">${dog('fly big')}<div class="small muted">${esc(t)}</div></div></div>`});
+  try{const r=await ANKI.loadBundle(code,t=>{ensureSky();const it=document.getElementById('intro');if(it){const m=it.querySelector('.intro-msg');if(m)m.textContent=t}else $('#app').innerHTML=`<div class="wrap"><div class="card center" style="margin-top:30vh">${dog('big','','load')}<div class="small muted">${esc(t)}</div></div></div>`});
     if(r){dropState();setTimeout(()=>toast(L(`Đã nạp ${r.cards} thẻ cùng lịch sử học`,`Loaded ${r.cards} cards with history`)),300)}}
   catch(e){console.warn(e);setTimeout(()=>toast(L('Chưa nạp được bộ thẻ','Could not load the card collection')),300)}
 }

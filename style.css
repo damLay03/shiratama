@@ -655,3 +655,44 @@ body.studying .cloud{animation-duration:var(--dur)}
 @keyframes syncp{50%{opacity:.35}}
 #sysync .kv{margin-top:6px}
 @media (min-width:1280px){.top .syncchip{position:fixed;left:20px;bottom:20px}}
+/* ---- sticker chó ong (khung hình) ---- */
+.dog.spr{width:calc(var(--dw,120px)*1.5);aspect-ratio:1}
+.dog.spr:not(.hop):not(.tilt):not(.fly){animation:none}
+.spr .sf{position:absolute;inset:0;background-repeat:no-repeat;background-position:0 0;pointer-events:none}
+@keyframes sp10{from{background-position-x:0.000%}to{background-position-x:111.111%}}
+@keyframes sp20a{from{background-position-x:0.000%}to{background-position-x:52.632%}}
+@keyframes sp20b{from{background-position-x:52.632%}to{background-position-x:105.263%}}
+@keyframes sp30a{from{background-position-x:0.000%}to{background-position-x:34.483%}}
+@keyframes sp30b{from{background-position-x:34.483%}to{background-position-x:68.966%}}
+@keyframes sp30c{from{background-position-x:68.966%}to{background-position-x:103.448%}}
+.sp-intro .sf{background-image:url(img/intro.webp?v=1);background-size:1000% 100%;animation:sp10 .85s steps(10) infinite}
+.sp-done .sf{background-image:url(img/done.webp?v=1);background-size:1000% 100%;animation:sp10 1.25s steps(10) infinite}
+.sp-wave .sf{background-image:url(img/wave.webp?v=1);background-size:1000% 100%;animation:sp10 1.3s steps(10) infinite}
+.sp-load .sf{background-image:url(img/load.webp?v=1);background-size:1000% 100%;animation:sp10 1.1s steps(10) infinite}
+.sp-search .sf{background-image:url(img/search.webp?v=1);background-size:1000% 100%;animation:sp10 1.8s steps(10) infinite}
+.sp-read .sf{background-image:url(img/read.webp?v=1);background-size:1000% 100%;animation:sp10 2.2s steps(10) infinite}
+.sp-home .sf{background-image:url(img/home.webp?v=1);background-size:2000% 100%;animation:sp20a 1.25s steps(10) infinite}
+.sp-study .sf{background-image:url(img/study.webp?v=1);background-size:3000% 100%;animation:sp30a 1.5s steps(10) infinite}
+.sp-logo .sf{background-image:url(img/logo.webp?v=1);background-size:1000% 100%;animation:splogo 9s infinite}
+@keyframes splogo{0.00%{background-position-x:0.000%}1.25%{background-position-x:11.111%}2.50%{background-position-x:22.222%}3.75%{background-position-x:33.333%}5.00%{background-position-x:44.444%}6.25%{background-position-x:55.556%}7.50%{background-position-x:66.667%}8.75%{background-position-x:77.778%}10.00%{background-position-x:88.889%}11.25%{background-position-x:100.000%}14%{background-position-x:0}100%{background-position-x:0}}
+.sp-logo .sf{animation-timing-function:step-end}
+.sp-home.talk .sf{animation:sp20b .9s steps(10) 2}
+.sp-study.yay .sf{animation:sp30b .9s steps(10) 1 forwards}
+.sp-study.sad .sf{animation:sp30c 1.3s steps(10) 1 forwards}
+/* ban đêm: chó phi hành gia (ảnh đứng yên, nhún nhẹ) */
+[data-mode=night] .sp-intro .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:11.111%;animation:none}
+[data-mode=night] .sp-logo .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:0.000%;animation:none}
+[data-mode=night] .sp-home .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:22.222%;animation:none}
+[data-mode=night] .sp-done .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:55.556%;animation:none}
+[data-mode=night] .sp-wave .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:33.333%;animation:none}
+[data-mode=night] .sp-load .sf{background-image:url(img/astro.webp?v=1);background-size:1000% 100%;background-position-x:44.444%;animation:none}
+[data-mode=night] .sp-home.talk .sf{background-position-x:77.778%}
+[data-mode=night] .dog.spr.sp-intro,[data-mode=night] .dog.spr.sp-logo,[data-mode=night] .dog.spr.sp-home,[data-mode=night] .dog.spr.sp-done,[data-mode=night] .dog.spr.sp-wave,[data-mode=night] .dog.spr.sp-load{animation:bob 3.2s ease-in-out infinite}
+.intro-dog.spr{width:190px;aspect-ratio:1}
+.intro-dog.spr .sf{background-image:url(img/intro.webp?v=1);background-size:1000% 100%;animation:sp10 .85s steps(10) infinite}
+[data-mode=night] .intro-dog.spr .sf{background-image:url(img/astro.webp?v=1);background-position-x:11.111%;animation:none}
+.empty .dog.spr{--dw:84px;margin:0 auto 6px}
+.sthead{display:flex;align-items:center;gap:12px}.sthead .dog.spr{--dw:58px;margin:-8px 0 -10px}
+@media (prefers-reduced-motion:reduce){.spr .sf{animation:none!important}}
+.dog.spr.mini{width:calc(var(--dw,34px)*1.25)}
+.stage>.dog.spr{width:calc(var(--dw,46px)*1.9)}

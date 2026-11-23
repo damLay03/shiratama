@@ -204,7 +204,7 @@ function sys(){
     <div class="kv"><span>${L('Bộ thẻ Anki cập nhật','Anki collection updated')}</span><b>${ls.get('shiratama-colv')?new Date(ls.get('shiratama-colv')*1000).toLocaleDateString(L('vi-VN','en-GB')):'—'}</b></div>
     <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này, đồng thời được gửi lên kho chung. Điện thoại và máy tính nhập cùng mã sẽ thấy cùng tiến độ.','Progress is saved here and synced. Devices with the same code share progress.')}</div>
     <div class="ot" style="margin-top:4px">${L('Đồng bộ','Sync')}</div>${SYNC.detail()}
-    <div class="row wrapbtn" style="margin:10px 0 12px"><button class="btn line" id="ssync">${L('Đồng bộ ngay','Sync now')}</button></div>
+    ${SYNC.on?`<div class="row wrapbtn" style="margin:10px 0 12px"><button class="btn line" id="ssync">${L('Đồng bộ ngay','Sync now')}</button></div>`:'<div style="height:12px"></div>'}
     <button class="btn line" id="slock">${L('Khóa app trên máy này','Lock app on this device')}</button></div>
   </div>`);
     $$('[data-l]').forEach(b=>b.onclick=()=>{S.lang=b.dataset.l;save();applyLook();draw()});
@@ -212,7 +212,7 @@ function sys(){
     $$('[data-sf]').forEach(b=>b.onclick=()=>{SFX.set(b.dataset.sf==='1');draw()});
     $('#sfv').oninput=e=>{S.sfxv=+e.target.value/100;save()};$('#sfv').onchange=()=>SFX.play('ok');
     $$('[data-try]').forEach(b=>b.onclick=()=>SFX.play(b.dataset.try));
-    $('#ssync').onclick=()=>SYNC.run();
+    if($('#ssync'))$('#ssync').onclick=()=>SYNC.run();
     $$('[data-tl]').forEach(b=>b.onclick=async()=>{if(b.dataset.tl==='1'){const ok=await SKYFX.askTilt();if(!ok)toast(L('iPhone chưa cho phép cảm biến chuyển động','Motion access was not allowed'))}else{S.tilt=0;save();document.documentElement.style.setProperty('--px',0);document.documentElement.style.setProperty('--py',0)}draw()});
     $('#smv').oninput=e=>{S.vol=+e.target.value/100;save();MUSIC.vol()};
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
@@ -1107,11 +1107,13 @@ async function openBundle(code){
    Dữ liệu nằm ở shiratama/{mã-băm}/s/{0..15, meta}. Mã băm tính từ mã mở app, nên máy nào nhập cùng mã là cùng một kho.
    Mỗi thẻ có mt (thời điểm sửa cuối); khi gộp, bản nào mới hơn thì thắng. */
 const SYNC=(()=>{
-  const FB={apiKey:'AIzaSyDa9OOERR8w7kgnkC5cU9-Nr9fZWuusuzU',project:'nihongo-with-na'};
-  const ROOT=`projects/${FB.project}/databases/(default)/documents`;
+  // database riêng của Shiratama (dự án Firebase của anh Nhân). Để null thì tắt đồng bộ.
+  const FB=null; // ví dụ {apiKey:'...',project:'...'}
+  const ROOT=FB?`projects/${FB.project}/databases/(default)/documents`:'';
   const API='https://firestore.googleapis.com/v1/';
   const NS=16;
-  let AUTH=ls.get('shiratama-auth',null);
+  try{localStorage.removeItem('shiratama-auth')}catch(e){}
+  let AUTH=ls.get('shiratama-auth2',null);if(AUTH&&FB&&AUTH.p!==FB.project)AUTH=null;
   let SPACE=null,running=null,again=false,timer=null,track=false;
   const st={state:'off',at:ls.get('shiratama-syncat',0),err:''};
   let dirty=ls.get('shiratama-dirty',{});       // id thẻ -> mt
@@ -1124,11 +1126,11 @@ const SYNC=(()=>{
     let r,j;
     if(AUTH&&AUTH.refreshToken){
       r=await fetch('https://securetoken.googleapis.com/v1/token?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'grant_type=refresh_token&refresh_token='+encodeURIComponent(AUTH.refreshToken)});
-      if(r.ok){j=await r.json();AUTH={idToken:j.id_token,refreshToken:j.refresh_token,exp:Date.now()+(+j.expires_in)*1000};ls.set('shiratama-auth',AUTH);return AUTH.idToken}
+      if(r.ok){j=await r.json();AUTH={idToken:j.id_token,refreshToken:j.refresh_token,exp:Date.now()+(+j.expires_in)*1000};AUTH.p=FB.project;ls.set('shiratama-auth2',AUTH);return AUTH.idToken}
     }
     r=await fetch('https://identitytoolkit.googleapis.com/v1/accounts:signUp?key='+FB.apiKey,{method:'POST',headers:{'Content-Type':'application/json'},body:'{"returnSecureToken":true}'});
     if(!r.ok)throw new Error('auth '+r.status);
-    j=await r.json();AUTH={idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn)*1000};ls.set('shiratama-auth',AUTH);return AUTH.idToken;
+    j=await r.json();AUTH={idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn)*1000};AUTH.p=FB.project;ls.set('shiratama-auth2',AUTH);return AUTH.idToken;
   }
   async function spaceOf(code){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shiratama-sync|'+code.trim()));return [...new Uint8Array(b)].slice(0,20).map(x=>x.toString(16).padStart(2,'0')).join('')}
   const docs=()=>[...Array(NS).keys()].map(String).concat('meta');
@@ -1218,6 +1220,7 @@ const SYNC=(()=>{
     if(st.state==='offline')return CLOUD+'<span>'+L('Mất mạng','Offline')+(n?` · ${n}`:'')+'</span>';
     return CLOUD+'<span>'+(st.at?L('Đã đồng bộ ','Synced ')+hm(st.at):L('Chưa đồng bộ','Not synced'))+'</span>'}
   function detail(){const n=Object.keys(dirty).length+Object.keys(tomb).length;
+    if(!FB)return `<div class="ohint">${L('Chưa cài database đồng bộ. Tiến độ đang lưu riêng trên từng máy.','Sync database not set up yet.')}</div>`;
     return `<div class="kv"><span>${L('Đồng bộ lần cuối','Last synced')}</span><b>${ago(st.at)}</b><span>${L('Thay đổi chờ gửi','Changes waiting')}</span><b>${n}${metaDirty?' + deck':''}</b><span>${L('Trạng thái','Status')}</span><b>${{ok:L('Ổn','OK'),busy:L('Đang đồng bộ…','Syncing…'),err:L('Lỗi','Error'),offline:L('Mất mạng','Offline'),rules:L('Chưa bật trên máy chủ','Not enabled on the server'),off:'—'}[st.state]||'—'}</b></div>${st.err?`<div class="ohint">${esc(st.err)}</div>`:''}`}
   async function run(){
     if(!SPACE)return;if(running){again=true;return running}
@@ -1244,6 +1247,7 @@ const SYNC=(()=>{
     const sp=savePresets;savePresets=p=>{sp(p);if(track){metaDirty=Date.now();saveDirty();soon()}};
   }
   async function start(code){
+    if(!FB){st.state='off';return}
     if(!window.ANKI||SPACE)return;
     SPACE=await spaceOf(code);wrap();
     // lần đầu trên máy này: gửi những thẻ đã học hoặc sửa trong app trước khi có đồng bộ
@@ -1254,7 +1258,7 @@ const SYNC=(()=>{
     window.addEventListener('online',run);
     document.addEventListener('click',e=>{if(e.target.closest('[data-sync]'))run()});
   }
-  return {start,run,chip:()=>`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st}};
+  return {start,run,chip:()=>!FB?'':`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st},get on(){return !!FB}};
 })();
 
 /* ---------- boot ---------- */

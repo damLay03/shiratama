@@ -133,7 +133,7 @@ const SKY=`<div class="sky"><div class="sky-grad"></div>
 function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);SKYFX.start()}}
 const SKYFX=(()=>{
   // màu trời theo giờ (ban ngày): bình minh hồng, trưa xanh, chiều vàng cam
-  const K=[[5,'#f6c9c4','#fde9dc'],[7,'#cfe6f8','#eef6fd'],[11,'#b7dbf7','#e7f4fe'],[15,'#c4e0f6','#eef5fb'],[17,'#f5d2b0','#fcecd9'],[18.5,'#e9b9c6','#f8e2df'],[24,'#e9b9c6','#f8e2df']];
+  const K=[[5,'#f0a9b4','#fcd9c8'],[7,'#7fbcf0','#d4ebfb'],[11,'#5aa8ec','#cfe8fb'],[15,'#72b4ee','#d9ecfa'],[17,'#f2b07a','#fbdcc0'],[18.5,'#d98aa8','#f6cfc8'],[24,'#d98aa8','#f6cfc8']];
   const hex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16)),mix=(a,b,t)=>'#'+hex(a).map((v,i)=>Math.round(v+(hex(b)[i]-v)*t).toString(16).padStart(2,'0')).join('');
   function tint(){const d=new Date(),h=d.getHours()+d.getMinutes()/60;let i=0;while(i<K.length-1&&K[i+1][0]<=h)i++;
     const A=K[i],B=K[Math.min(i+1,K.length-1)];const t=B[0]>A[0]?Math.min(1,Math.max(0,(h-A[0])/(B[0]-A[0]))):0;
@@ -372,7 +372,7 @@ function isDue(c,now,de){if(c.card.state===0)return false;const t=new Date(c.car
 
 /* ---- cài đặt (preset) giống Anki ---- */
 const PDEF={name:'Default',newDay:9999,revDay:9999,learn:[1,10],relearn:[10],gradIvl:1,minLapse:1,leechN:8,leechAct:'tag',
-  newOrder:'added',revOrder:'due',mix:'before',buryNew:false,buryRev:false,showTimer:false,capSec:60,ret:0.9,maxIvl:36500,w:''};
+  newOrder:'added',revOrder:'due',mix:'before',buryNew:false,buryRev:false,showTimer:false,capSec:60,autoQ:6,autoA:4,autoAct:'again',ret:0.9,maxIvl:36500,w:''};
 function presets(){let p=ls.get('shiratama-presets',null);if(!p||!p['1']){p=Object.assign({'1':Object.assign({},PDEF)},p||{});ls.set('shiratama-presets',p)}return p}
 function savePresets(p){ls.set('shiratama-presets',p)}
 function presetOf(d){const p=presets();return Object.assign({},PDEF,p[(d&&d.cfgId)||'1']||p['1'])}
@@ -507,6 +507,11 @@ async function deckOptions(name){
      ${sw('otimer',c.showTimer,L('Hiện thời gian đang nghĩ trên mỗi thẻ','Show a timer on each card'))}
      <label class="lab">${L('Nghĩ lâu hơn số giây này thì chỉ tính bằng số này','Count at most this many seconds')}<input class="field" id="ocap" type="number" min="5" value="${c.capSec}"></label>
      ${H(L('Để thống kê thời gian học không bị đội lên khi anh bỏ đi giữa chừng.','Keeps study time stats sane if you walk away mid-card.'))}</div>
+   <div class="osec"><div class="ot">${L('Tự lướt thẻ','Auto advance')}</div>
+     ${H(L('Bật trong lúc học bằng nút ⋯ ở góc trên. App tự lật thẻ và tự chuyển thẻ theo số giây dưới đây.','Turn on while studying from the ⋯ button.'))}
+     <label class="lab">${L('Mặt trước hiện bao nhiêu giây rồi tự lật','Seconds before showing the answer')}<input class="field" id="oaq" type="number" min="1" value="${c.autoQ}"></label>
+     <label class="lab">${L('Mặt sau hiện bao nhiêu giây','Seconds to show the answer')}<input class="field" id="oaa" type="number" min="1" value="${c.autoA}"></label>
+     <label class="lab">${L('Hết giờ mặt sau mà anh chưa chấm thì','When time runs out')}${opt('oact',c.autoAct,[['again',L('Tính là Quên','Count as Forgot')],['good',L('Tính là Nhớ','Count as Remembered')],['remind',L('Chỉ nhắc, chờ anh chấm','Just remind me')]])}</label></div>
    <div class="osec"><div class="ot">${L('Cách tính lịch ôn','Scheduling')}</div>
      <label class="lab">${L('Muốn nhớ được bao nhiêu phần trăm thẻ','Target memory rate')} <b id="oretv">${Math.round(c.ret*100)}%</b><input type="range" id="oret" min="70" max="99" value="${Math.round(c.ret*100)}"></label>
      ${H(L('Cao hơn thì ôn dày hơn, nhớ chắc hơn nhưng mỗi ngày nhiều thẻ hơn. 90% là mức Anki khuyên dùng.','Higher means more reviews per day but better memory. 90% is the usual choice.'))}
@@ -534,7 +539,7 @@ async function deckOptions(name){
     const collect=()=>{if(!q('#onew'))return;const c=P[pid]=Object.assign({},PDEF,P[pid]);
       c.newDay=Math.max(0,+q('#onew').value|0);c.revDay=Math.max(0,+q('#orev').value|0);c.learn=parseSteps(q('#olearn').value);c.relearn=parseSteps(q('#orelearn').value);
       c.gradIvl=Math.max(1,+q('#ograd').value|0);c.newOrder=q('#onord').value;c.minLapse=Math.max(1,+q('#ominl').value|0);c.leechN=Math.max(1,+q('#oleech').value|0);c.leechAct=q('#oleechA').value;
-      c.mix=q('#omix').value;c.revOrder=q('#orord').value;c.buryNew=q('#obn').checked;c.buryRev=q('#obr').checked;c.showTimer=q('#otimer').checked;c.capSec=Math.max(5,+q('#ocap').value|0);
+      c.mix=q('#omix').value;c.revOrder=q('#orord').value;c.buryNew=q('#obn').checked;c.buryRev=q('#obr').checked;c.showTimer=q('#otimer').checked;c.capSec=Math.max(5,+q('#ocap').value|0);c.autoQ=Math.max(1,+q('#oaq').value||6);c.autoA=Math.max(1,+q('#oaa').value||4);c.autoAct=q('#oact').value;
       c.ret=+q('#oret').value/100;c.w=q('#ow').value.trim();c.maxIvl=Math.max(1,+q('#omax').value|0)};
     q('#osave').onclick=async()=>{collect();savePresets(P);for(const k in FS)delete FS[k];
       const nn=q('#oname').value.trim();
@@ -783,23 +788,39 @@ function renderAnki(){
   const deck=AK.decks.find(d=>d.id===it.deck);const P=presetOf(deck);
   const left=AK.list.length-AK.i;
   const cnt={n:0,l:0,r:0};AK.list.slice(AK.i).forEach(c=>{const s=c.card.state;if(s===0)cnt.n++;else if(s===2)cnt.r++;else cnt.l++});
-  full(`<div class="sbar"><button class="iconbtn" id="akq" aria-label="Stop">${I.x}</button><div class="ttl">${AK.title?esc(AK.title)+' · ':''}<span class="qc"><b class="cn ${it.card.state===0?'cur':''}">${cnt.n}</b> <b class="cl ${it.card.state===1||it.card.state===3?'cur':''}">${cnt.l}</b> <b class="cr ${it.card.state===2?'cur':''}">${cnt.r}</b></span>${P.showTimer?` · <span id="aktm">0:00</span>`:''}</div><button class="iconbtn sm2" id="aksm" aria-label="A-">A−</button><button class="iconbtn sm2" id="aksp" aria-label="A+">A+</button><button class="iconbtn sm2 ${MUSIC.on?'on':''}" id="akmu" aria-label="${L('Nhạc','Music')}">${I.note}</button><button class="iconbtn" id="akedit" aria-label="Edit">${I.pen}</button><button class="iconbtn" id="akundo" aria-label="Undo" ${AK.hist.length?'':'disabled style="opacity:.35"'}>${I.undo}</button></div>
-   <div class="dstat"><span class="a">${L('Quên','Forgot')} ${AK.a}</span><span class="g">${L('Nhớ','Remembered')} ${AK.g}</span></div>
-   <div class="deckwrap"><div class="stage" id="stage"><div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
-     <div class="zone l">← ${L('Quên','Forgot')}</div><div class="zone r">${L('Nhớ','Remembered')} →</div></div>
-     <div class="akfoot">${dog('buddy','akdog')}<div class="tiny center grow" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div></div></div>`);
+  const done=AK.a+AK.g,tot=done+left;
+  full(`<div class="sbar"><button class="iconbtn" id="akq" aria-label="${L('Dừng','Stop')}">${I.x}</button>
+     <div class="ttl">${AK.title?`<small>${esc(AK.title)}</small>`:''}<span class="qc"><b class="cn ${it.card.state===0?'cur':''}">${cnt.n}</b><b class="cl ${it.card.state===1||it.card.state===3?'cur':''}">${cnt.l}</b><b class="cr ${it.card.state===2?'cur':''}">${cnt.r}</b>${P.showTimer?`<span id="aktm">0:00</span>`:''}</span></div>
+     <button class="iconbtn" id="akundo" aria-label="${L('Hoàn tác','Undo')}" ${AK.hist.length?'':'disabled'}>${I.undo}</button>
+     <button class="iconbtn ${AK.auto?'on':''}" id="akmenu" aria-label="${L('Tùy chọn','More')}">${I.dots}</button>
+     <div class="akpop" id="akpop">
+       <button id="akauto" class="${AK.auto?'on':''}">${I.play}<span>${AK.auto?L('Đang tự lướt','Auto advance on'):L('Tự lướt thẻ','Auto advance')}<small>${L(`Mặt trước ${P.autoQ}s, mặt sau ${P.autoA}s, hết giờ thì ${P.autoAct==='good'?'Nhớ':P.autoAct==='remind'?'chỉ nhắc':'Quên'}`,`Front ${P.autoQ}s, back ${P.autoA}s`)}</small></span></button>
+       <div class="row"><button id="aksm">A−</button><button id="aksp">A+</button></div>
+       <button id="akmu" class="${MUSIC.on?'on':''}">${I.note}<span>${L('Nhạc nền','Music')}</span></button>
+       <button id="akedit">${I.pen}<span>${L('Sửa thẻ này','Edit this card')}</span></button>
+     </div></div>
+   <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
+   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy','akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+     <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
   const shown0=Date.now();clearInterval(AK.tmr);if(P.showTimer)AK.tmr=setInterval(()=>{const e=$('#aktm');if(!e)return clearInterval(AK.tmr);e.textContent=fmtTime(Math.min(P.capSec,(Date.now()-shown0)/1000))},1000);
-  $('#akq').onclick=()=>{clearInterval(AK.tmr);AK=null;dropState();TAB='home';render()};
+  $('#akq').onclick=()=>{clearInterval(AK.tmr);clearTimeout(AK.at);AK=null;dropState();TAB='home';render()};
   $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};
   $('#aksm').onclick=e=>{e.stopPropagation();S.size=Math.max(0,S.size-1);save();applyLook()};
   $('#aksp').onclick=e=>{e.stopPropagation();S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()};
   $('#akmu').onclick=e=>{MUSIC.toggle();e.currentTarget.classList.toggle('on',MUSIC.on)};
-  $('#akedit').onclick=e=>{e.stopPropagation();quickEdit(it)};
+  $('#akedit').onclick=e=>{e.stopPropagation();$('#akpop').classList.remove('open');quickEdit(it)};
+  $('#akmenu').onclick=e=>{e.stopPropagation();$('#akpop').classList.toggle('open')};
+  $('#akpop').onclick=e=>e.stopPropagation();
+  document.body.onclick=()=>{const p=$('#akpop');if(p)p.classList.remove('open')};
+  $('#akauto').onclick=()=>{AK.auto=!AK.auto;$('#akpop').classList.remove('open');renderAnki()};
   const fc=$('#fc'),stage=$('#stage');
   let busy=false;
-  const flip=()=>{AK.show=true;SFX.play('flip');dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akhint').innerHTML=L('Chạm nửa phải hoặc vuốt phải = Nhớ · nửa trái hoặc vuốt trái = Quên','Right half or swipe right = Remembered · left half or swipe left = Forgot')+`<span class="desk"> · ${L('phím 1 = Quên, phím 2 hoặc cách = Nhớ','key 1 = Forgot, 2 or space = Remembered')}</span>`};
-  const grade=async(g)=>{if(busy)return;busy=true;glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
+  const ring=(sec)=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
+  const flip=()=>{AK.show=true;SFX.play('flip');dogDo($('#akdog'),'buzz');fc.classList.add('flip');stage.classList.add('shown');$('#akwrap').classList.add('shown');
+    clearTimeout(AK.at);if(AK.auto){ring(P.autoA);AK.at=setTimeout(()=>{if(!AK||AK.list[AK.i]!==it)return;if(P.autoAct==='remind'){SFX.play('tap');dogSay($('#akdog'),L('Anh ơi, chấm thẻ này nè','Time to grade this one'),2500)}else grade(P.autoAct==='good'?3:1)},P.autoA*1000)}};
+  clearTimeout(AK.at);if(AK.auto){ring(P.autoQ);AK.at=setTimeout(()=>{if(AK&&AK.list[AK.i]===it&&!AK.show)flip()},P.autoQ*1000)}
+  const grade=async(g)=>{if(busy)return;busy=true;clearTimeout(AK.at);glow(stage,g===3);SFX.play(g===3?'ok':'ng');clearInterval(AK.tmr);dogDo($('#akdog'),g===3?'hop':'tilt');fc.style.transform='';fc.classList.add(g===3?'fly-r':'fly-l');
     const prev=JSON.parse(JSON.stringify(it));const pos=AK.i;const was=it.card.state;const ms=Math.min(P.capSec*1000,Date.now()-shown0);
     const D=daily();const dsnap=JSON.parse(JSON.stringify(D));
     if(hasF)it.card=schedule(it.card,g,P);
@@ -831,6 +852,7 @@ function renderAnki(){
     if(moved){if(dx>70)return grade(3);if(dx<-70)return grade(1);fc.style.transform='';return}
     if(Math.abs(e.clientY-sy)>12)return;
     const r=stage.getBoundingClientRect();grade(e.clientX>r.left+r.width/2?3:1)};
+  $('#gq').onclick=()=>{if(AK.show)grade(1)};$('#gn').onclick=()=>{if(AK.show)grade(3)};
   fc.addEventListener('pointerup',end);fc.addEventListener('pointercancel',()=>{drag=false;fc.style.transform='';fc.style.transition=''});
   AK.key=e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;
     if(!AK.show){if(e.key===' '||e.key==='Enter'){e.preventDefault();flip()}}

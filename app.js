@@ -55,15 +55,21 @@ async function deriveKey(code,salt){
   return crypto.subtle.deriveKey({name:'PBKDF2',salt,iterations:150000,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['decrypt']);
 }
 const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+// bộ nhớ đệm trên máy cho đề đã giải mã, để lần mở sau không phải tải và giải mã lại (không chứa tiến độ học)
+const KV=(()=>{let db;const open=()=>db||(db=new Promise((res,rej)=>{const r=indexedDB.open('shiratama-cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)}));
+  const run=(mode,f)=>open().then(d=>new Promise((res,rej)=>{const q=f(d.transaction('kv',mode).objectStore('kv'));q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error)}));
+  return {get:k=>run('readonly',s=>s.get(k)).catch(()=>null),set:(k,v)=>run('readwrite',s=>s.put(v,k)).catch(()=>null)}})();
+async function codeTag(code){const h=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shiratama-ck|'+code.trim()));return [...new Uint8Array(h)].slice(0,8).map(x=>x.toString(16).padStart(2,'0')).join('')}
 async function loadContent(code){
-  const idx=await fetch('data/index.json',{cache:'no-cache'}).then(r=>r.json());
-  const exams=[];
-  for(const f of idx.files){
+  const [idx,ck]=await Promise.all([fetch('data/index.json',{cache:'no-cache'}).then(r=>r.json()),codeTag(code)]);
+  const exams=await Promise.all(idx.files.map(async f=>{
+    const c=await KV.get('ex:'+f),tag=idx.tag&&idx.tag[f];
+    if(c&&c.ck===ck&&tag&&c.iv===tag)return c.ex;
     const enc=await fetch('data/'+f,{cache:'no-cache'}).then(r=>r.json());
+    if(c&&c.ck===ck&&c.iv===enc.iv)return c.ex;
     const key=await deriveKey(code,b64(enc.salt));
     const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(enc.iv)},key,b64(enc.data));
-    exams.push(JSON.parse(new TextDecoder().decode(plain)));
-  }
+    const ex=JSON.parse(new TextDecoder().decode(plain));KV.set('ex:'+f,{ck,iv:enc.iv,ex});return ex}));
   return {exams};
 }
 function indexData(){QI={};DATA.exams.forEach(ex=>ex.qs.forEach(q=>{QI[q.id]={q,ex}}))}
@@ -352,7 +358,9 @@ function gFront(x){const t=[...new Set(String(x.jp).replace(/\s+[A-Za-z][A-Za-z 
   return `${esc(jp)}<div class="ro">${esc(String(x.ro).replace(/\s*particle$/,''))}</div>`}
 async function seedGram(){
   if(!window.ANKI)return;
-  let H={v:0};try{if(ls.get('shiratama-gramseed',0)>=3){H=await GRAM.htmlAll();if((H.v||0)<=ls.get('shiratama-gramhtml',0))return}}catch(e){return}
+  // mỗi bản app chỉ kiểm tra thẻ ngữ pháp một lần, các lần mở sau bỏ qua cho nhanh
+  if(ls.get('shiratama-gramseed',0)>=3&&ls.get('shiratama-gramchk','')===window.APPV)return;
+  let H={v:0};try{if(ls.get('shiratama-gramseed',0)>=3){H=await GRAM.htmlAll();if((H.v||0)<=ls.get('shiratama-gramhtml',0)){ls.set('shiratama-gramchk',window.APPV);return}}}catch(e){return}
   try{const g=await GRAM.load();if(!H.v)H=await GRAM.htmlAll().catch(()=>({v:0}));const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
     const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
     if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
@@ -364,7 +372,7 @@ async function seedGram(){
         if(have.has(id)){const c=old[id];if(!c.edited&&c.front!==front){c.front=front;c.fl=[front,back];c.back=front+'<hr id=answer>';fix.push(c)}return}
         cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>',tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
     if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);if(fix.length)await ANKI.putMany('cards',fix);
-    ls.set('shiratama-gramseed',3);ls.set('shiratama-gramhtml',H.v||0);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
+    ls.set('shiratama-gramseed',3);ls.set('shiratama-gramhtml',H.v||0);ls.set('shiratama-gramchk',window.APPV);if(cards.length||fix.length)dropState()}catch(e){console.warn('gram',e)}
 }
 // ảnh trong thẻ mà máy chưa có: ảnh ngữ pháp mã hóa, hoặc ảnh anh tự thêm ở máy khác
 window.ANKI_FB=async n=>{if(n.startsWith('gram:'))return GRAM.blob(n.slice(5));return SYNC.getMedia(n)};

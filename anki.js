@@ -157,6 +157,8 @@ async function gunzip(buf){const ds=new DecompressionStream('gzip');const st=new
 const lsg=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
 const lss=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
 async function loadBundle(code,onStep){
+  // xem số phiên bản nhỏ trước, khỏi tải lại cả bộ thẻ 2MB mỗi lần mở app
+  try{const vv=await fetch('data/col/ver.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null);if(vv&&lsg('shiratama-colv',0)>=vv.v&&await tx('cards','readonly',s=>s.count())>0)return null}catch(e){}
   let head;try{head=await fetch('data/col/col.enc.json',{cache:'no-cache'}).then(r=>{if(!r.ok)throw 0;return r.json()})}catch(e){return null}
   const have=lsg('shiratama-colv',0);
   const cnt=await tx('cards','readonly',s=>s.count());

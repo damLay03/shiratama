@@ -952,8 +952,8 @@ body.studying .cloud{animation-duration:var(--dur)}
 .gc-nb{margin-top:10px}
 .gc-l{position:relative;padding-left:16px}
 .gc-l::before{content:"";position:absolute;left:2px;top:.8em;width:6px;height:6px;border-radius:50%;background:var(--gc)}
-.gc-n4{--gc:var(--s3)}.gc-n3{--gc:var(--s2)}.gc-n2{--gc:var(--s5)}.gc-n1{--gc:#8f6fd6}
-:root[data-mode="night"] .gc-n1{--gc:#a98bf0}
+.gc-n5{--gc:#2f6fb3}.gc-n4{--gc:#3a9e8f}.gc-n3{--gc:#5c9a06}.gc-n2{--gc:#ee8a12}.gc-n1{--gc:#df2a86}
+:root[data-mode="night"] .gc-n5{--gc:#5b9ae0}:root[data-mode="night"] .gc-n4{--gc:#4fc2b0}:root[data-mode="night"] .gc-n3{--gc:#86c52a}:root[data-mode="night"] .gc-n2{--gc:#f7a13a}:root[data-mode="night"] .gc-n1{--gc:#f05aa5}
 .gc-p{word-break:keep-all;overflow-wrap:anywhere}
 @media (max-width:520px){.gc-p{font-size:calc(var(--jp-size) * 1.45)}.fc .face:has(.gc){padding:16px 14px}}
 .gc-g+.gc-g{margin-top:2px;padding-top:0;border-top:0}

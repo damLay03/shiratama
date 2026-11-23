@@ -193,12 +193,14 @@ async function mediaFromBundle(n){
   const blob=new Blob([raw],{type});try{await put('media',{name:n,blob})}catch(e){}return blob;
 }
 async function hydrate(el){const imgs=el.querySelectorAll('img[src]');for(const im of imgs){const n=decodeURIComponent(im.getAttribute('src'));if(/^(https?:|data:|blob:)/.test(n))continue;
-  try{if(!urlCache[n]){const m=await tx('media','readonly',s=>s.get(n));const blob=m?m.blob:await mediaFromBundle(n);if(blob)urlCache[n]=URL.createObjectURL(blob)}}catch(e){}
+  try{if(!urlCache[n]){const m=await tx('media','readonly',s=>s.get(n));let blob=m?m.blob:await mediaFromBundle(n);
+    if(!blob&&window.ANKI_FB){blob=await window.ANKI_FB(n);if(blob&&n.startsWith('gram:'))try{await put('media',{name:n,blob})}catch(e){}}
+    if(blob)urlCache[n]=URL.createObjectURL(blob)}}catch(e){}
   if(urlCache[n])im.src=urlCache[n]}}
 
 async function logReview(id,entry){const r=await tx('revlog','readonly',s=>s.get(id));const row=(r&&Array.isArray(r.logs))?r:{id,logs:[]};row.logs.push(entry);await put('revlog',row)}
 async function getRev(id){return tx('revlog','readonly',s=>s.get(id))}
 const del=(store,id)=>tx(store,'readwrite',s=>s.delete(id));
 
-window.ANKI={importApkg,all,put,putMany,del,delDeck,hydrate,loadBundle,logReview,getRev};
+window.ANKI={importApkg,all,put,putMany,del,delDeck,hydrate,loadBundle,logReview,getRev,getMedia:n=>tx('media','readonly',s=>s.get(n))};
 })();

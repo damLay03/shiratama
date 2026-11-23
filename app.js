@@ -244,8 +244,9 @@ function sys(){
   draw();
 }
 
-/* ---------- v46: deck tự lướt, thanh tự lướt, ngữ pháp bằng ảnh flashcard ---------- */
+/* ---------- v46+: deck tự lướt, thanh tự lướt, ảnh trong thẻ ---------- */
 const GRADE_OF={again:1,hard:2,good:3,easy:4};
+const STAR='star';
 let FV=null;
 
 // deck nào đang ở chế độ tự lướt (deck con theo deck cha gần nhất có đặt chế độ)
@@ -258,7 +259,7 @@ function autoBarHTML(on,q,a,act,o={}){
   const st=(k,lab,v)=>`<div class="ab-s"><span>${lab}</span><button data-ab="${k}-" aria-label="−">−</button><b data-abv="${k}">${v}s</b><button data-ab="${k}+" aria-label="+">+</button></div>`;
   return `<div class="autobar" id="abar" ${S.autoBar===0&&!o.always?'hidden':''}>
     <button class="ab-play ${on?'on':''}" data-ab="play">${on?I.pause:I.play}<span>${on?L('Đang lướt','Running'):L('Tự lướt','Auto')}</span></button>
-    ${o.single?st('a',L('Mỗi thẻ','Each card'),a):st('q',L('Mặt trước','Front'),q)+st('a',L('Mặt sau','Back'),a)}
+    ${st('q',L('Mặt trước','Front'),q)+st('a',L('Mặt sau','Back'),a)}
     ${o.grade?`<div class="ab-g"><span>${L('Tự bấm','Auto grade')}</span>${[['again',L('Quên','Again')],['hard',L('Khó','Hard')],['good',L('Nhớ','Good')],['easy',L('Dễ','Easy')],['remind',L('Tự chấm','Manual')]].map(([k,l])=>`<button data-act="${k}" class="${act===k?'on':''}">${l}</button>`).join('')}</div>`:''}
   </div>`}
 function bindAutoBar(bar,ctl){if(!bar)return;
@@ -274,107 +275,165 @@ function bindAutoBar(bar,ctl){if(!bar)return;
 function newDeckDialog(st){
   const v=document.createElement('div');v.className='veil';
   v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:800;font-size:18px">${L('Tạo deck mới','New deck')}</div><button class="iconbtn" id="nx">${I.x}</button></div>
-   <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="nn" placeholder="${L('Ví dụ Grammar::N3','e.g. Grammar::N3')}"></label>
-   <div class="ohint">${L('Dùng :: để làm deck con.','Use :: for subdecks.')}</div>
+   <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="nn" placeholder="${L('Ví dụ N3','e.g. N3')}"></label>
+   <label class="lab">${L('Nằm trong deck','Inside deck')}${parentSelect('npar',st,'',null)}</label>
    <div class="ot" style="margin-top:14px">${L('Cách học','How to study')}</div>
    <div class="modepick">
     <label class="mp"><input type="radio" name="nm" value="srs" checked><span><b>${L('Học đề xuất','Scheduled')}</b><small>${L('App tính lịch ôn như Anki. Mỗi ngày chấm Nhớ/Quên các thẻ đến hạn.','Spaced repetition like Anki. Grade the cards due each day.')}</small></span></label>
-    <label class="mp"><input type="radio" name="nm" value="flip"><span><b>${L('Tự lướt thẻ','Flip through')}</b><small>${L('Muốn học lúc nào thì mở ra lướt. Không chấm điểm, không tính lịch, không cộng vào số thẻ hôm nay.','Open and flip whenever you like. No grading, no schedule.')}</small></span></label>
+    <label class="mp"><input type="radio" name="nm" value="flip"><span><b>${L('Tự lướt thẻ','Flip through')}</b><small>${L('Muốn học lúc nào thì mở ra lướt, đánh dấu ★ cái chưa thuộc. Không tính lịch, không cộng vào số thẻ hôm nay.','Open and flip whenever you like, star what you don\'t know. No schedule.')}</small></span></label>
    </div>
    <div class="ohint">${L('Đổi lại sau được trong nút ⋯ của deck.','You can change this later in the deck ⋯ menu.')}</div>
    <button class="btn bee" id="nok" style="width:100%;margin-top:14px">${L('Tạo deck','Create')}</button></div>`;
   document.body.appendChild(v);const q=s=>v.querySelector(s);q('#nn').focus();
   const close=()=>v.remove();v.onclick=e=>{if(e.target===v)close()};q('#nx').onclick=close;
-  const go=async()=>{const nm=q('#nn').value.trim();if(!nm)return q('#nn').focus();
+  const go=async()=>{const short=q('#nn').value.trim().replace(/::+/g,' ');if(!short)return q('#nn').focus();
+    const par=q('#npar').value;const nm=(par?par+'::':'')+short;
     if(st.decks.some(d=>d.name===nm)){toast(L('Đã có deck này','Deck exists'));return}
     const mode=v.querySelector('[name=nm]:checked').value;
-    await ANKI.put('decks',{id:'d'+Date.now(),name:nm,at:Date.now(),cfgId:'1',mode});close();dropState();ankiBox()};
+    await ANKI.put('decks',{id:'d'+Date.now(),name:nm,at:Date.now(),cfgId:'1',mode,ord:Date.now()/1e6});close();dropState();ankiBox()};
   q('#nok').onclick=go;q('#nn').onkeydown=e=>{if(e.key==='Enter')go()};
 }
+// chọn deck cha (bỏ chính nó và deck con của nó)
+function parentSelect(id,st,cur,self){const tree=deckTree(st);const out=[];
+  const walk=(n,dep)=>{if(self&&(n===self||n.startsWith(self+'::')))return;out.push([n,dep]);tree.nodes[n].kids.forEach(k=>walk(k,dep+1))};tree.roots.forEach(r=>walk(r,0));
+  return `<select class="field" id="${id}"><option value="">${L('(Không, để ở ngoài cùng)','(None, top level)')}</option>${out.map(([n,d])=>`<option value="${esc(n)}" ${n===cur?'selected':''}>${'  '.repeat(d)}${esc(n.split('::').pop())}</option>`).join('')}</select>`}
 
-/* ---- ngữ pháp bằng ảnh (mã hóa như đề) ---- */
-const GRAM=(()=>{let key=null,idx=null,loading=null;const urls=new Map();
+/* ---- sắp thứ tự deck ---- */
+async function moveDeck(st,name,dir){
+  const tree=deckTree(st);const par=name.includes('::')?name.slice(0,name.lastIndexOf('::')):null;
+  const sib=(par?tree.nodes[par].kids:tree.roots).slice();const i=sib.indexOf(name),j=i+dir;if(i<0||j<0||j>=sib.length)return;
+  [sib[i],sib[j]]=[sib[j],sib[i]];
+  const rows=[];sib.forEach((n,k)=>{let d=tree.nodes[n].deck;if(!d){d={id:'d'+Date.now()+k,name:n,at:Date.now(),cfgId:'1'}}d.ord=k+1;rows.push(d)});
+  await ANKI.putMany('decks',rows);dropState();ankiBox()}
+
+/* ---- ngữ pháp JLPT: ảnh mã hóa, nạp thành deck thường một lần ---- */
+const GRAM=(()=>{let key=null,idx=null,loading=null;
   async function load(){if(idx)return idx;if(loading)return loading;const code=ls.get('shiratama-code');if(!code)throw new Error('no code');
     loading=(async()=>{const e=await fetch('data/gram/index.enc.json?v='+window.APPV).then(r=>{if(!r.ok)throw new Error('http');return r.json()});key=await deriveKey(code,b64(e.salt));
       const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.data));idx=JSON.parse(new TextDecoder().decode(p));return idx})();
     try{return await loading}catch(e){loading=null;throw e}}
-  function img(lv,n,tag){const k=lv+'/'+n+tag;if(urls.has(k))return urls.get(k);
-    const pr=(async()=>{const r=await fetch(`data/gram/${k}.bin?g=1`);if(!r.ok)throw new Error('http');const b=new Uint8Array(await r.arrayBuffer());
-      const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));return URL.createObjectURL(new Blob([p],{type:'image/webp'}))})();
-    urls.set(k,pr);pr.catch(()=>urls.delete(k));return pr}
-  return {load,img,get idx(){return idx}};
+  async function blob(path){await load();const r=await fetch(`data/gram/${path}.bin?g=1`);if(!r.ok)throw new Error('http');const b=new Uint8Array(await r.arrayBuffer());
+    const p=await crypto.subtle.decrypt({name:'AES-GCM',iv:b.slice(0,12)},key,b.slice(12));return new Blob([p],{type:'image/webp'})}
+  return {load,blob};
 })();
 const GLV=['N5','N4','N3','N2','N1'];
-function gramRows(){const g=GRAM.idx;
-  return `<div class="deckhead gramhead"><span class="grow">${L('Ngữ pháp · lướt ảnh','Grammar · flip images')}</span></div>
-  ${g?GLV.filter(l=>g[l]).map(l=>`<div class="deckrow" style="--d:0"><span class="tw"></span><button class="dn" data-gram="${l}">${l}</button><span class="dflip">${g[l].length} ${L('mẫu · lướt','points · flip')}</span><span style="width:34px"></span></div>`).join('')
-     :`<div class="tiny" style="padding:10px 0">${L('Đang mở ảnh ngữ pháp…','Loading grammar…')}</div>`}`}
-function gramInit(){const bind=()=>$$('[data-gram]').forEach(b=>b.onclick=()=>startGram(b.dataset.gram));
-  if(GRAM.idx)return bind();
-  GRAM.load().then(()=>{const box=$('#gramBox');if(box){box.innerHTML=gramRows();bind()}}).catch(()=>{const box=$('#gramBox');if(box)box.innerHTML=''})}
+async function seedGram(){
+  if(ls.get('shiratama-gramseed',0)>=1||!window.ANKI)return;
+  try{const g=await GRAM.load();const decks=await ANKI.all('decks');const have=new Set((await ANKI.all('cards')).map(c=>c.id));
+    const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
+    if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
+    const cards=[];const t0=Date.UTC(2026,10,23);
+    GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}
+      g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;if(have.has(id))return;const tag=x.s?'s':'r';
+        const front=esc(x.jp),back=`<img src="gram:${lv}/${n}${tag}">`;
+        cards.push({id,deck:d.id,guid:id,fl:[front,back],front,back:front+'<hr id=answer>'+back,tags:'JLPT_'+lv,appAt:0,created:t0+li*1000+n,card:emptyCard()})})});
+    if(nd.length)await ANKI.putMany('decks',nd);if(cards.length)await ANKI.putMany('cards',cards);
+    ls.set('shiratama-gramseed',1);if(cards.length)dropState()}catch(e){console.warn('gram',e)}
+}
+// ảnh trong thẻ mà máy chưa có: ảnh ngữ pháp mã hóa, hoặc ảnh anh tự thêm ở máy khác
+window.ANKI_FB=async n=>{if(n.startsWith('gram:'))return GRAM.blob(n.slice(5));return SYNC.getMedia(n)};
 
-/* ---- màn lướt ---- */
-const wideScreen=()=>innerWidth>innerHeight*1.15;
+/* ---- ảnh do anh tự thêm: nén webp, lưu máy, gửi lên kho đồng bộ ---- */
+async function imgToCard(file){
+  const bmp=await createImageBitmap(file);let max=1080,q=.82,out;
+  for(let k=0;k<6;k++){const sc=Math.min(1,max/Math.max(bmp.width,bmp.height));const c=document.createElement('canvas');c.width=Math.round(bmp.width*sc);c.height=Math.round(bmp.height*sc);
+    c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);out=await new Promise(r=>c.toBlob(r,'image/webp',q));if(out&&out.size<550000)break;max=Math.round(max*.8);q=Math.max(.6,q-.06)}
+  const h=[...new Uint8Array(await crypto.subtle.digest('SHA-1',await out.arrayBuffer()))].slice(0,10).map(x=>x.toString(16).padStart(2,'0')).join('');
+  const name='u'+h+'.webp';await ANKI.put('media',{name,blob:out});SYNC.putMedia(name);return name}
+
+/* ---- màn lướt: danh sách → lướt, ★ chưa thuộc ---- */
+const isStar=c=>(' '+(c.tags||'')+' ').includes(' '+STAR+' ');
+async function setStar(c,on){const t=new Set((c.tags||'').split(/\s+/).filter(Boolean));on?t.add(STAR):t.delete(STAR);c.tags=[...t].join(' ');try{await ANKI.put('cards',c)}catch(e){toast(L('Không lưu được','Could not save'))}}
 function startFlipDeck(st,set,name){
-  const items=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
-  if(!items.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
-  openFlip({kind:'cards',key:'d:'+name,title:name.split('::').pop(),items})}
-function startGram(lv){const g=GRAM.idx;if(!g||!g[lv])return;
-  openFlip({kind:'gram',key:'g:'+lv,title:L('Ngữ pháp ','Grammar ')+lv,items:g[lv].map((x,n)=>Object.assign({lv,n},x))})}
-function openFlip(o){S.flipPos=S.flipPos||{};const at=S.flipPos[o.key]||0;
-  FV=Object.assign(o,{order:o.items,i:Math.min(at,o.items.length-1),show:false,auto:false,shuf:false,wide:wideScreen()});render()}
-function flipCfg(){S.flipAuto=Object.assign({q:4,a:4,img:8},S.flipAuto||{});return S.flipAuto}
-function renderFlip(){
-  const F=FV,it=F.items[F.i],N=F.items.length,cfg=flipCfg(),G=F.kind==='gram';
-  F.wide=wideScreen();
-  const body=G?`<div class="gstage" id="stage"><div class="gimg ${F.wide?'r':'s'}" id="gbox"><div class="gload tiny">${L('Đang mở ảnh…','Loading…')}</div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
-`
-   :`<div class="stage" id="stage"><div class="fc ${F.show?'flip':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>`;
-  full(`<div class="sbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${I.x}</button>
-     <div class="ttl"><small>${esc(F.title)} · ${L('tự lướt','flip')}</small><span class="qc"><b>${F.i+1}</b><span class="tiny"> / ${N}</span></span></div>
-     <button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button>
-     ${G?'':`<button class="iconbtn" id="fvsm" aria-label="A−">A−</button><button class="iconbtn" id="fvsp" aria-label="A+">A+</button>`}</div>
+  const all=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
+  if(!all.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
+  S.flipPos=S.flipPos||{};FV={key:'d:'+name,title:name.split('::').pop(),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
+  flipItems();render()}
+function flipItems(){const F=FV;let it=F.all;if(F.only)it=it.filter(isStar);if(F.shuf)it=F.shufOrder?F.shufOrder.filter(c=>it.includes(c)):it;F.items=it;
+  if(F.i>=it.length)F.i=Math.max(0,it.length-1)}
+function flipCfg(){S.flipAuto=Object.assign({q:4,a:4},S.flipAuto||{});return S.flipAuto}
+const hasBack=c=>stripHtml(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join('')).trim()!==''||/<img/i.test(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join(''));
+function renderFlip(){return FV.view==='list'?renderFlipList():renderFlipCard()}
+function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
+  return `<div class="sbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${F.view==='list'?I.x:I.back}</button>
+   <div class="ttl"><small>${esc(F.title)} · ${L('tự lướt','flip')}</small><span class="qc">${extra}</span></div>
+   <button class="iconbtn starf ${F.only?'on':''}" id="fvonly" aria-label="${L('Chỉ thẻ ★','Starred only')}" title="${L('Chỉ lướt thẻ ★','Starred only')}">★<small>${n}</small></button>
+   <button class="iconbtn ${F.shuf?'on':''}" id="fvsh" aria-label="${L('Trộn thứ tự','Shuffle')}" title="${L('Trộn thứ tự','Shuffle')}">${I.shuffle}</button></div>`}
+function bindFlipTop(){const F=FV;
+  $('#fvonly').onclick=()=>{if(!F.only&&!F.all.some(isStar)){toast(L('Chưa có thẻ ★ nào','No starred cards yet'));return}F.only=!F.only;S.flipOnly=S.flipOnly||{};S.flipOnly[F.name]=F.only;save();F.i=0;flipItems();render()};
+  $('#fvsh').onclick=()=>{F.shuf=!F.shuf;F.shufOrder=F.shuf?shuffle(F.all):null;F.i=0;flipItems();toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));render()}}
+function renderFlipList(){
+  const F=FV,N=F.items.length,pos=Math.min(S.flipPos[F.key]||0,F.all.length-1),cont=F.all[pos];
+  full(`${flipTop(`<b>${N}</b><span class="tiny"> ${L('thẻ','cards')}</span>`)}
+   <div class="flist">
+    <div class="row wrapbtn fl-act"><button class="btn bee grow" id="flgo">${F.only?L('Lướt các thẻ ★','Flip starred'):L('Lướt từ đầu','Start')}</button>${!F.only&&!F.shuf&&pos>0?`<button class="btn line grow" id="flcont">${L('Tiếp tục từ thẻ ','Continue at ')}${pos+1}</button>`:''}</div>
+    <div class="tiny" style="margin:2px 2px 10px">${L('Chạm thẻ để lướt từ thẻ đó. ★ là thẻ anh đánh dấu chưa thuộc.','Tap a card to start there. ★ marks cards you don\'t know yet.')}</div>
+    ${N?`<div class="ftiles">${F.items.map((c,k)=>{const t=stripHtml(c.front).trim();const im=!t&&/<img/i.test(c.front);
+      return `<button class="ftile ${isStar(c)?'st':''} ${im?'im':''}" data-fi="${k}"><span class="fn">${k+1}</span>${isStar(c)?'<span class="fs">★</span>':''}${im?`<div class="fth" data-th="${k}"></div>`:`<span class="ft jp">${esc(t.slice(0,40))}</span>`}</button>`}).join('')}</div>`
+      :`<div class="card center tiny">${L('Chưa có thẻ ★ nào.','No starred cards.')}</div>`}
+   </div>`);
+  bindFlipTop();
+  $('#fvq').onclick=()=>{FV=null;TAB='home';render()};
+  $('#flgo').onclick=()=>{F.i=0;F.view='card';F.show=false;render()};
+  if($('#flcont'))$('#flcont').onclick=()=>{F.i=pos;F.view='card';F.show=false;render()};
+  $$('[data-fi]').forEach(b=>b.onclick=()=>{F.i=+b.dataset.fi;F.view='card';F.show=false;render()});
+  // ảnh nhỏ: chỉ nạp khi cuộn tới
+  const io=new IntersectionObserver(es=>es.forEach(e=>{if(!e.isIntersecting)return;io.unobserve(e.target);const c=F.items[+e.target.dataset.th];
+    const m=String(c.front).match(/<img[^>]*>/i);if(m){e.target.innerHTML=m[0];ANKI.hydrate(e.target)}}),{rootMargin:'300px'});
+  $$('[data-th]').forEach(x=>io.observe(x));
+}
+function renderFlipCard(){
+  const F=FV,N=F.items.length;if(!N){F.view='list';return renderFlipList()}
+  const it=F.items[F.i],cfg=flipCfg(),two=hasBack(it);
+  full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
-   ${autoBarHTML(F.auto,cfg.q,G?cfg.img:cfg.a,null,{single:G,always:true})}
-   <div class="deckwrap flipwrap" id="akwrap">${body}
-     <div class="fvfoot">${G?`<div class="gcap"><b class="jp">${esc(it.jp)}</b> <span class="tiny">${esc(it.ro)}</span></div>`:''}<div class="fvnav"><button class="btn line" id="fvp" ${F.i?'':'disabled'}>‹ ${L('Trước','Prev')}</button>
-       <input type="range" id="fvr" class="grow" min="1" max="${N}" value="${F.i+1}" aria-label="${L('Đến thẻ','Go to card')}">
-       <button class="btn bee" id="fvn" ${F.i<N-1?'':'disabled'}>${L('Sau','Next')} ›</button></div>
-     <div class="tiny center fvhint">${G?L('Chạm nửa phải để sang ảnh sau, nửa trái để quay lại · vuốt ngang cũng được','Tap right half for next, left half for previous · or swipe'):L('Chạm thẻ để lật · vuốt trái sang thẻ sau, vuốt phải quay lại','Tap to flip · swipe left for next, right for previous')}<span class="desk"> · ← → ${L('và phím cách','and space')}</span></div></div></div>`);
-  if(!G)ANKI.hydrate($('#fc'));
+   ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
+   <div class="deckwrap flipwrap" id="akwrap"><div class="stage" id="stage"><div class="fc ${F.show?'flip':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
+     <button class="starbtn ${isStar(it)?'on':''}" id="fvstar" aria-label="${L('Đánh dấu chưa thuộc','Star')}">★</button><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+</div>`);
+  ANKI.hydrate($('#fc'));
+  bindFlipTop();
   const ring=sec=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
   const unring=()=>{const r=$('#aring');if(r)r.classList.remove('run')};
-  const go=k=>{clearTimeout(F.at);if(k<0||k>=N){if(k>=N&&F.auto){F.auto=false;toast(L('Hết deck rồi','End of deck'))}renderFlip();return}F.i=k;F.show=false;if(!F.shuf){S.flipPos[F.key]=k;save()}renderFlip()};
+  const go=k=>{clearTimeout(F.at);if(k>=N){F.auto=false;F.view='list';toast(L('Hết lượt lướt','End of deck'));render();return}if(k<0)return;
+    F.i=k;F.show=false;if(!F.shuf&&!F.only){S.flipPos[F.key]=F.all.indexOf(F.items[k]);save()}renderFlipCard()};
   const next=()=>go(F.i+1),prev=()=>go(F.i-1);
-  const flip=()=>{if(G)return;F.show=!F.show;SFX.play('flip');$('#fc').classList.toggle('flip',F.show);arm()};
+  const flip=()=>{if(!two)return;F.show=!F.show;SFX.play('flip');$('#fc').classList.toggle('flip',F.show);arm()};
+  const star=async(adv)=>{const on=!isStar(it);await setStar(it,on);const b=$('#fvstar');if(b)b.classList.toggle('on',on);const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length;
+    toast(on?L('Đã đánh dấu ★ chưa thuộc','Starred'):L('Đã bỏ ★','Unstarred'));if(adv)setTimeout(next,250)};
   const arm=()=>{clearTimeout(F.at);if(!F.auto)return unring();
-    if(G){ring(cfg.img);F.at=setTimeout(next,cfg.img*1000);return}
-    if(!F.show){ring(cfg.q);F.at=setTimeout(()=>{if(FV===F&&!F.show)flip()},cfg.q*1000)}else{ring(cfg.a);F.at=setTimeout(next,cfg.a*1000)}};
-  bindAutoBar($('#abar'),{get on(){return F.auto},set on(v){F.auto=v;arm()},get q(){return cfg.q},get a(){return G?cfg.img:cfg.a},
-    set(k,v){if(k==='autoQ')cfg.q=v;else if(G)cfg.img=v;else cfg.a=v;save()}});
-  $('#fvq').onclick=()=>{clearTimeout(F.at);FV=null;TAB='home';render()};
-  $('#fvsh').onclick=()=>{F.shuf=!F.shuf;const cur=F.items[F.i];F.items=F.shuf?shuffle(F.order.slice()):F.order.slice();F.i=F.shuf?0:Math.max(0,F.items.indexOf(cur));if(F.shuf)F.items.splice(F.items.indexOf(cur),1),F.items.unshift(cur);toast(F.shuf?L('Đã trộn thứ tự','Shuffled'):L('Về thứ tự gốc','Original order'));renderFlip()};
-  if($('#fvsm')){$('#fvsm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook()};$('#fvsp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook()}}
-  $('#fvp').onclick=prev;$('#fvn').onclick=next;$('#fvr').onchange=e=>go(+e.target.value-1);
-  $('#fvr').oninput=e=>{const q=document.querySelector('.qc b');if(q)q.textContent=e.target.value};
-  // ảnh ngữ pháp: vuông cho điện thoại, chữ nhật cho máy tính
-  if(G){const tag=F.wide?(it.r?'r':'s'):(it.s?'s':'r');
-    GRAM.img(it.lv,it.n,tag).then(u=>{if(FV!==F||F.items[F.i]!==it)return;const b=$('#gbox');if(b)b.innerHTML=`<img src="${u}" alt="${esc(it.jp)}" draggable="false">`}).catch(()=>{const b=$('#gbox');if(b)b.innerHTML=`<div class="gload tiny">${L('Không mở được ảnh này','Could not load this image')}</div>`});
-    for(const d of [1,2,-1]){const x=F.items[F.i+d];if(x){const t=F.wide?(x.r?'r':'s'):(x.s?'s':'r');GRAM.img(x.lv,x.n,t).catch(()=>{})}}}
-  // chạm, vuốt
-  const stage=$('#stage');let sx=0,sy=0,down=false;
-  stage.addEventListener('pointerdown',e=>{if(e.target.closest('a,button,input'))return;sx=e.clientX;sy=e.clientY;down=true});
-  stage.addEventListener('pointerup',e=>{if(!down)return;down=false;const dx=e.clientX-sx,dy=e.clientY-sy;
-    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy))return dx<0?next():prev();
-    if(Math.abs(dx)>12||Math.abs(dy)>12)return;
-    if(G){const r=stage.getBoundingClientRect();return e.clientX>r.left+r.width/2?next():prev()}
-    flip()});
+    if(!two){ring(cfg.q);F.at=setTimeout(()=>toNext(),cfg.q*1000);return}
+    if(!F.show){ring(cfg.q);F.at=setTimeout(()=>{if(FV===F&&!F.show)flip()},cfg.q*1000)}else{ring(cfg.a);F.at=setTimeout(()=>toNext(),cfg.a*1000)}};
+  bindAutoBar($('#abar'),{get on(){return F.auto},set on(v){F.auto=v;arm()},get q(){return cfg.q},get a(){return cfg.a},
+    set(k,v){if(k==='autoQ')cfg.q=v;else cfg.a=v;save()}});
+  $('#fvq').onclick=()=>{clearTimeout(F.at);F.auto=false;F.view='list';render()};
+  $('#fvstar').onclick=e=>{e.stopPropagation();star(false)};
+  $('#fvstar').onpointerdown=e=>e.stopPropagation();
+  // quẹt: thẻ chạy theo tay rồi bay đi
+  const stage=$('#stage'),fc=$('#fc');let sx=0,sy=0,down=false,busy=false;
+  const ry=()=>F.show?' rotateY(180deg)':'';
+  const fly=(dir,then)=>{if(busy)return;busy=true;clearTimeout(F.at);fc.style.transition='transform .26s ease-in,opacity .26s';
+    fc.style.transform=dir==='u'?`translateY(-115%) scale(.9)${ry()}`:`translateX(${dir==='l'?-125:125}%) rotate(${dir==='l'?-14:14}deg)${ry()}`;fc.style.opacity='0';
+    SFX.play(dir==='u'?'ok':'flip');setTimeout(then,220)};
+  const toNext=()=>{if(F.i>=N-1)return next();fly('l',next)},toPrev=()=>{if(!F.i){snap();return}fly('r',prev)};
+  const snap=()=>{fc.style.transition='transform .25s cubic-bezier(.3,1.5,.5,1)';fc.style.transform=F.show?'rotateY(180deg)':''};
+  stage.addEventListener('pointerdown',e=>{if(busy||e.target.closest('a,button,input'))return;sx=e.clientX;sy=e.clientY;down=true;fc.style.transition='none';stage.setPointerCapture(e.pointerId)});
+  stage.addEventListener('pointermove',e=>{if(!down)return;const dx=e.clientX-sx,dy=e.clientY-sy;if(Math.abs(dx)<6&&Math.abs(dy)<6)return;
+    const up=-dy>Math.abs(dx);fc.style.transform=up?`translateY(${Math.min(0,dy)}px)${ry()}`:`translateX(${dx}px) rotate(${dx/26}deg)${ry()}`;
+    fc.classList.toggle('tint-r',!up&&dx>50);fc.classList.toggle('tint-l',!up&&dx<-50)});
+  const end=e=>{if(!down)return;down=false;fc.classList.remove('tint-r','tint-l');const dx=e.clientX-sx,dy=e.clientY-sy;
+    if(-dy>70&&-dy>Math.abs(dx)){const on=!isStar(it);setStar(it,on).then(()=>{const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length});toast(on?L('Đã đánh dấu ★ chưa thuộc','Starred'):L('Đã bỏ ★','Unstarred'));return fly('u',()=>go(F.i+1))}
+    if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy))return dx<0?toNext():toPrev();
+    snap();if(Math.abs(dx)>12||Math.abs(dy)>12)return;
+    if(!two){const r=stage.getBoundingClientRect();return e.clientX>r.left+r.width/2?toNext():toPrev()}
+    flip()};
+  stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',()=>{down=false;snap()});
   F.key=e=>{if(e.target.closest&&e.target.closest('input,textarea,select'))return;
-    if(e.key==='ArrowRight'){e.preventDefault();next()}else if(e.key==='ArrowLeft'){e.preventDefault();prev()}
-    else if(e.key===' '||e.key==='Enter'){e.preventDefault();G?next():flip()}else if(e.key==='Escape')$('#fvq').click()};
+    if(e.key==='ArrowRight'){e.preventDefault();toNext()}else if(e.key==='ArrowLeft'){e.preventDefault();toPrev()}
+    else if(e.key==='s'||e.key==='S'||e.key==='ArrowUp'){e.preventDefault();star(false)}
+    else if(e.key===' '||e.key==='Enter'){e.preventDefault();two?flip():toNext()}else if(e.key==='Escape')$('#fvq').click()};
   arm();
 }
-window.addEventListener('resize',()=>{if(FV&&FV.kind==='gram'&&FV.wide!==wideScreen())renderFlip()});
 
 function render(){
   stopAudio();applyLook();
@@ -543,8 +602,9 @@ function daily(){const k=dayKey();if(!S.daily||S.daily.day!==k)S.daily={day:k,n:
 function deckTree(st){
   const nodes={};const get=name=>nodes[name]||(nodes[name]={name,id:null,kids:[],cards:[]});
   st.decks.forEach(d=>{const n=get(d.name);n.id=d.id;n.deck=d;const parts=d.name.split('::');for(let i=1;i<parts.length;i++){const p=parts.slice(0,i).join('::'),c=parts.slice(0,i+1).join('::');const pn=get(p);if(!pn.kids.includes(c))pn.kids.push(c);get(c)}});
-  const roots=Object.keys(nodes).filter(n=>!n.includes('::')).sort((a,b)=>a.localeCompare(b));
-  Object.values(nodes).forEach(n=>n.kids.sort((a,b)=>a.localeCompare(b)));
+  const ord=n=>{const d=nodes[n].deck;return d&&d.ord!=null?d.ord:1e9};const cmp=(a,b)=>ord(a)-ord(b)||a.localeCompare(b);
+  const roots=Object.keys(nodes).filter(n=>!n.includes('::')).sort(cmp);
+  Object.values(nodes).forEach(n=>n.kids.sort(cmp));
   return {nodes,roots};
 }
 function nodeSet(st,tree,name){const s=new Set();const walk=n=>{const x=tree.nodes[n];if(x.id)s.add(x.id);x.kids.forEach(walk)};walk(name);return s}
@@ -569,6 +629,7 @@ function ankiQueue(cards,deckSet,decks,topName){
   return {due:learn.concat(R),learn,rev:R,fresh:N,mix:TP.mix};
 }
 
+let SORTING=false;
 function home(){
   shell(`${header()}<div id="ankiBox" class="homegrid"><div class="card tiny">${L('Đang đọc thẻ…','Loading cards…')}</div></div>`);
   ankiBox();
@@ -585,7 +646,8 @@ async function ankiBox(){
       ${modeOf(name,st.decks)==='flip'?`<button class="dn" data-flipd="${esc(name)}">${esc(short)}</button><span class="dflip">${st.cards.filter(c=>!c.susp&&set.has(c.deck)).length} ${L('thẻ · lướt','cards · flip')}</span>`
        :`<button class="dn" data-study="${esc(name)}">${esc(short)}</button>
       <span class="dc new">${q.fresh.length||''}</span><span class="dc lrn">${q.learn.length||''}</span><span class="dc due">${q.rev.length||''}</span>`}
-      <button class="iconbtn sm" data-opt="${esc(name)}" aria-label="${L('Tùy chọn deck','Deck options')}">${I.dots}</button></div>`;
+      ${SORTING?`<span class="dsort"><button class="iconbtn sm" data-mv="${esc(name)}" data-d="-1" aria-label="${L('Lên','Up')}">↑</button><button class="iconbtn sm" data-mv="${esc(name)}" data-d="1" aria-label="${L('Xuống','Down')}">↓</button></span>`
+       :`<button class="iconbtn sm" data-opt="${esc(name)}" aria-label="${L('Tùy chọn deck','Deck options')}">${I.dots}</button>`}</div>`;
     if(kids&&!col[name])n.kids.forEach(k=>h+=row(k,depth+1));return h};
   const nAll=tot.due.length+tot.fresh.length;
   box.innerHTML=`<div class="hcol">
@@ -604,10 +666,9 @@ async function ankiBox(){
    </div>
    <div class="tiny" id="impMsg"></div></div>
    <div class="card deckcard">
-   ${st.cards.length?`<div class="deckhead"><span class="grow">Deck</span><span class="dc new">${L('Mới','New')}</span><span class="dc lrn">${L('Học','Learn')}</span><span class="dc due">${L('Ôn','Due')}</span><span style="width:34px"></span></div>
+   ${st.cards.length?`<div class="deckhead"><span class="grow">Deck <button class="sortbtn ${SORTING?'on':''}" id="dsortbtn">${SORTING?L('Xong','Done'):L('Sắp xếp','Reorder')}</button></span><span class="dc new">${L('Mới','New')}</span><span class="dc lrn">${L('Học','Learn')}</span><span class="dc due">${L('Ôn','Due')}</span><span style="width:34px"></span></div>
    <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}
-   <div id="gramBox">${gramRows()}</div></div>`;
-  gramInit();
+   </div>`;
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
   const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
@@ -615,6 +676,8 @@ async function ankiBox(){
   $$('[data-study]').forEach(b=>b.onclick=()=>startAnki(nodeSet(st,tree,b.dataset.study),b.dataset.study));
   $$('[data-flipd]').forEach(b=>b.onclick=()=>startFlipDeck(st,nodeSet(st,tree,b.dataset.flipd),b.dataset.flipd));
   $$('[data-opt]').forEach(b=>b.onclick=()=>deckOptions(b.dataset.opt));
+  const sb=$('#dsortbtn');if(sb)sb.onclick=()=>{SORTING=!SORTING;if(SORTING)toast(L('Bấm ↑ ↓ để đổi thứ tự. Muốn bỏ deck vào deck khác thì vào ⋯ của deck.','Use ↑ ↓ to reorder. To nest a deck, use its ⋯ menu.'));ankiBox()};
+  $$('[data-mv]').forEach(b=>b.onclick=()=>moveDeck(st,b.dataset.mv,+b.dataset.d));
   $('#addC').onclick=()=>addCards();
   $('#goBr').onclick=()=>{TAB='browse';S.lastStudy='browse';save();BR.sel=null;render()};
   $('#newD').onclick=()=>newDeckDialog(st);
@@ -687,10 +750,11 @@ async function deckOptions(name){
      <label class="lab">${L('Lâu nhất bao nhiêu ngày mới ôn một lần','Maximum interval (days)')}<input class="field" id="omax" type="number" min="1" value="${c.maxIvl}"></label>
      ${H(L('Dù thẻ dễ đến đâu cũng không để lâu hơn số ngày này.','Even easy cards come back within this many days.'))}</div>
    <div class="osec"><div class="ot">${L('Deck này','This deck')}</div>
-     <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="oname" value="${esc(name)}"></label>
+     <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="oname" value="${esc(name.split('::').pop())}"></label>
+     <label class="lab">${L('Nằm trong deck','Inside deck')}${parentSelect('opar',st,name.includes('::')?name.slice(0,name.lastIndexOf('::')):'',name)}</label>
      <label class="lab">${L('Cách học deck này','How to study this deck')}${opt('omode',modeOf(name,st.decks),[['srs',L('Học đề xuất (app tính lịch ôn)','Scheduled (spaced repetition)')],['flip',L('Tự lướt thẻ (không tính lịch)','Flip through (no scheduling)')]])}</label>
      ${H(L('Tự lướt: mở ra là lướt hết thẻ theo thứ tự, không chấm Nhớ/Quên, không tính vào số thẻ cần học hôm nay. Lịch ôn cũ của thẻ vẫn giữ nguyên, đổi lại học đề xuất là tiếp tục như trước.','Flip: browse all cards in order without grading. Existing schedules are kept.'))}
-     ${H(L('Dùng :: để làm deck con, ví dụ "FPT::JPD316".','Use :: for subdecks, e.g. "FPT::JPD316".'))}
+     ${H(L('Chọn deck cha để gom deck này vào trong deck đó (như kéo thả trong Anki). Deck con của nó đi theo.','Pick a parent to nest this deck; its subdecks move along.'))}
      ${sw('osub',false,L('Cho các deck con dùng chung bộ cài đặt này','Apply preset to all subdecks'))}</div>
    <div class="row wrapbtn" style="margin:6px 0 4px"><button class="btn line sm" id="obrowse">${L('Xem thẻ','Browse')}</button><button class="btn line sm" id="oadd">${L('Thêm thẻ','Add')}</button><button class="btn line sm" id="ostat">${L('Thống kê','Stats')}</button><button class="btn line sm" id="oexp">${L('Xuất file','Export')}</button><button class="btn line sm" id="odel" style="color:var(--ng)">${L('Xóa deck','Delete')}</button></div>
    <div class="osave"><button class="btn bee" id="osave" style="width:100%">${L('Lưu','Save')}</button></div>
@@ -711,7 +775,8 @@ async function deckOptions(name){
       c.mix=q('#omix').value;c.revOrder=q('#orord').value;c.buryNew=q('#obn').checked;c.buryRev=q('#obr').checked;c.showTimer=q('#otimer').checked;c.capSec=Math.max(5,+q('#ocap').value|0);c.autoQ=Math.max(1,+q('#oaq').value||6);c.autoA=Math.max(1,+q('#oaa').value||4);c.autoAct=q('#oact').value;
       c.ret=+q('#oret').value/100;c.w=q('#ow').value.trim();c.maxIvl=Math.max(1,+q('#omax').value|0)};
     q('#osave').onclick=async()=>{collect();savePresets(P);for(const k in FS)delete FS[k];
-      const nn=q('#oname').value.trim();
+      const sh=q('#oname').value.trim().replace(/::+/g,' ')||name.split('::').pop();const par=q('#opar').value;const nn=(par?par+'::':'')+sh;
+      if(nn!==name&&st.decks.some(x=>x.name===nn)){toast(L('Đã có deck tên này ở chỗ đó','A deck with that name is already there'));return}
       const targets=q('#osub').checked?st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::')):[d];
       targets.forEach(x=>x.cfgId=pid);const md=q('#omode').value;if(modeOf(name,st.decks)!==md||d.mode)d.mode=md;if(!targets.includes(d))targets.push(d);await ANKI.putMany('decks',targets);
       if(nn&&nn!==name){const rows=st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::'));rows.forEach(x=>x.name=nn+x.name.slice(name.length));await ANKI.putMany('decks',rows)}
@@ -756,24 +821,35 @@ async function addCards(deckId){
   const v=document.createElement('div');v.className='veil';
   v.innerHTML=`<div class="panel wide">
    <div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:800;font-size:18px">${L('Thêm thẻ','Add cards')}</div><button class="iconbtn" id="ax">${I.x}</button></div>
-   <div class="seg" style="margin-bottom:12px"><button data-am="paste" class="on">${L('Dán nhiều thẻ','Paste many')}</button><button data-am="one">${L('Từng thẻ','One card')}</button></div>
+   <div class="seg" style="margin-bottom:12px"><button data-am="paste" class="on">${L('Dán nhiều thẻ','Paste many')}</button><button data-am="one">${L('Từng thẻ','One card')}</button><button data-am="img">${L('Từ ảnh','From images')}</button></div>
    <label class="lab">Deck<select class="field" id="adeck">${decks.map(d=>`<option value="${esc(d.id)}" ${d.id===def?'selected':''}>${esc(d.name)}</option>`).join('')}</select></label>
    <div id="apaste"><label class="lab">${L('Dán các dòng Mặt trước⇥Mặt sau (HTML được). Dòng #deck:Tên đổi deck.','Paste lines Front⇥Back (HTML ok). A #deck:Name line picks the deck.')}<textarea class="field mono" id="atxt" rows="8"></textarea></label>
      <label class="chk"><input type="checkbox" id="aover"> ${L('Thẻ trùng mặt trước: ghi đè mặt sau (giữ lịch ôn)','Duplicate front: overwrite back (keep schedule)')}</label>
      <div class="tiny" id="ainfo" style="margin-top:6px"></div></div>
    <div id="aone" style="display:none"><label class="lab">${L('Mặt trước','Front')}<textarea class="field" id="af" rows="2"></textarea></label><label class="lab">${L('Mặt sau','Back')}<textarea class="field" id="ab" rows="5"></textarea></label><label class="lab">Tags<input class="field" id="at"></label></div>
+   <div id="aimg" style="display:none"><label class="lab">${L('Chọn một hoặc nhiều ảnh, mỗi ảnh thành một thẻ (ảnh ở mặt trước)','Pick one or more images, one card each')}<input class="field" id="afiles" type="file" accept="image/*" multiple></label>
+     <label class="lab">${L('Ảnh đặt ở','Image goes on')}<select class="field" id="aipos"><option value="back">${L('Mặt sau, mặt trước là tên file ảnh (sửa được sau)','Back; front = file name')}</option><option value="front">${L('Mặt trước','Front')}</option></select></label>
+     <label class="lab" id="aibl" style="display:none">${L('Mặt sau (không bắt buộc, giống nhau cho mọi ảnh)','Back (optional)')}<input class="field" id="aib"></label><div class="tiny" id="aiinfo"></div></div>
    <button class="btn bee" id="ago" style="width:100%;margin-top:14px">${L('Thêm','Add')}</button></div>`;
   document.body.appendChild(v);
   let mode='paste';
   const close=()=>{v.remove();dropState();render()};
   v.querySelector('#ax').onclick=close;
-  v.querySelectorAll('[data-am]').forEach(b=>b.onclick=()=>{mode=b.dataset.am;v.querySelectorAll('[data-am]').forEach(x=>x.classList.toggle('on',x===b));v.querySelector('#apaste').style.display=mode==='paste'?'':'none';v.querySelector('#aone').style.display=mode==='one'?'':'none'});
+  v.querySelectorAll('[data-am]').forEach(b=>b.onclick=()=>{mode=b.dataset.am;v.querySelectorAll('[data-am]').forEach(x=>x.classList.toggle('on',x===b));v.querySelector('#apaste').style.display=mode==='paste'?'':'none';v.querySelector('#aone').style.display=mode==='one'?'':'none';v.querySelector('#aimg').style.display=mode==='img'?'':'none'});
+  v.querySelector('#aipos').onchange=e=>{v.querySelector('#aibl').style.display=e.target.value==='front'?'':'none'};
+  v.querySelector('#afiles').onchange=e=>{v.querySelector('#aiinfo').textContent=L(`${e.target.files.length} ảnh → ${e.target.files.length} thẻ`,`${e.target.files.length} images`)};
+  // chèn ảnh vào thẻ đơn
+  [['af',L('Chèn ảnh vào mặt trước','Image on front')],['ab',L('Chèn ảnh vào mặt sau','Image on back')]].forEach(([id,lab])=>{const t=v.querySelector('#'+id);const b=document.createElement('button');b.className='btn line sm';b.style.marginTop='6px';b.textContent='🖼 '+lab;
+    b.onclick=()=>{const i=document.createElement('input');i.type='file';i.accept='image/*';i.onchange=async()=>{const n=await imgToCard(i.files[0]);t.value+=(t.value?'<br>':'')+`<img src="${n}">`};i.click()};t.parentNode.after(b)});
   const info=()=>{const r=parsePaste(v.querySelector('#atxt').value);const ok=r.rows.filter(x=>!x.err).length,bad=r.rows.length-ok;
     v.querySelector('#ainfo').textContent=ok||bad?L(`${ok} thẻ hợp lệ${bad?`, ${bad} dòng thiếu dấu tab`:''}${r.deckName?` · vào deck ${r.deckName}`:''}`,`${ok} cards${bad?`, ${bad} lines without a tab`:''}${r.deckName?` · into ${r.deckName}`:''}`):''};
   v.querySelector('#atxt').oninput=info;
   v.querySelector('#ago').onclick=async()=>{
     let deck=v.querySelector('#adeck').value;S.lastDeck=deck;save();
     const all=(await ankiState(true)).cards;
+    if(mode==='img'){const fs=[...v.querySelector('#afiles').files];if(!fs.length)return;const bk=v.querySelector('#aib').value.trim();const add=[];
+      for(let k=0;k<fs.length;k++){v.querySelector('#aiinfo').textContent=L(`Đang xử lý ảnh ${k+1}/${fs.length}…`,`Processing ${k+1}/${fs.length}…`);try{const n=await imgToCard(fs[k]);const im=`<img src="${n}">`;const c=v.querySelector('#aipos').value==='front'?makeCard(deck,im,bk,''):makeCard(deck,esc(fs[k].name.replace(/\.[^.]+$/,'')),im,'');c.created+=k;add.push(c)}catch(e){console.warn(e)}}
+      if(add.length)await ANKI.putMany('cards',add);toast(L(`Đã thêm ${add.length} thẻ ảnh`,`Added ${add.length} image cards`));close();return}
     if(mode==='one'){const f=v.querySelector('#af').value.trim(),b=v.querySelector('#ab').value.trim();if(!f)return;
       await ANKI.put('cards',makeCard(deck,f,b,v.querySelector('#at').value.trim()));toast(L('Đã thêm 1 thẻ','Added 1 card'));v.querySelector('#af').value='';v.querySelector('#ab').value='';v.querySelector('#af').focus();dropState();return}
     const r=parsePaste(v.querySelector('#atxt').value);
@@ -1272,7 +1348,8 @@ document.addEventListener('pointerdown',e=>{const b=e.target.closest('button,.dn
 async function openBundle(code){
   if(!window.ANKI)return;
   try{const r=await ANKI.loadBundle(code,t=>{ensureSky();const it=document.getElementById('intro');if(it){const m=it.querySelector('.intro-msg');if(m)m.textContent=t}else $('#app').innerHTML=`<div class="wrap"><div class="card center" style="margin-top:30vh">${dog('big','','load')}<div class="small muted">${esc(t)}</div></div></div>`});
-    if(r){dropState();setTimeout(()=>toast(L(`Đã nạp ${r.cards} thẻ cùng lịch sử học`,`Loaded ${r.cards} cards with history`)),300)}}
+    if(r){dropState();setTimeout(()=>toast(L(`Đã nạp ${r.cards} thẻ cùng lịch sử học`,`Loaded ${r.cards} cards with history`)),300)}
+    await seedGram()}
   catch(e){console.warn(e);setTimeout(()=>toast(L('Chưa nạp được bộ thẻ','Could not load the card collection')),300)}
 }
 /* shiratama — đồng bộ tiến độ giữa các máy (Firestore REST, không cần SDK)
@@ -1359,8 +1436,21 @@ const SYNC=(()=>{
       ls.set('shiratama-metamt',M.mt);changed++}
     return changed;
   }
+  // ảnh anh tự thêm: mỗi ảnh một doc riêng s/m_<tên>, chỉ tải về khi thẻ cần
+  const mdoc=n=>'m_'+String(n).replace(/[^\w.-]/g,'_');
+  const blobB64=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.readAsDataURL(b)});
+  function putMedia(n){const q=ls.get('shiratama-mpend',[])||[];if(!q.includes(n)){q.push(n);ls.set('shiratama-mpend',q)}if(FB&&SPACE)soon()}
+  async function flushMedia(){let q=ls.get('shiratama-mpend',[])||[];
+    for(const n of q.slice()){const m=await raw.getMedia(n);
+      if(m&&m.blob){try{await push(mdoc(n),{t:m.blob.type,b:await blobB64(m.blob)},null)}catch(e){if(e.status!==409&&e.status!==400)throw e}}
+      q=q.filter(x=>x!==n);ls.set('shiratama-mpend',q)}}
+  async function getMedia(n){if(!FB||!SPACE)return null;
+    const r=await fetch(API+ROOT+'/'+path(mdoc(n)),{headers:{Authorization:'Bearer '+await idToken()}});if(!r.ok)return null;
+    const j=await r.json();const d=JSON.parse(j.fields.data.stringValue);const blob=new Blob([b64(d.b)],{type:d.t||'image/webp'});
+    try{await ANKI.put('media',{name:n,blob})}catch(e){}return blob}
   async function once(){
     const t0=Date.now();
+    await flushMedia();
     const R=await pull();
     const changed=await applyRemote(R);
     // gửi phần đã đổi trên máy này
@@ -1373,7 +1463,7 @@ const SYNC=(()=>{
           const c=byId.get(id);if(!c)continue;const rec=await recOf(c);const r=data[id];if(!r||r.mt<=rec.mt)data[id]=rec}
         await push(k,data,R[k].ut)}
     }
-    if(metaDirty){const decks=(await raw.all('decks')).map(d=>({id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0}));
+    if(metaDirty){const decks=(await raw.all('decks')).map(d=>{const o={id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0};if(d.mode)o.mode=d.mode;if(d.ord!=null)o.ord=d.ord;return o});
       const M=R.meta.data||{};const dx=(M.dx||[]).slice();(ls.get('shiratama-deckdel',[])||[]).forEach(id=>{if(!dx.includes(id))dx.push(id)});
       const mt=Math.max(metaDirty,Date.now());await push('meta',{mt,decks,dx,presets:ls.get('shiratama-presets',null)},R.meta.ut);ls.set('shiratama-metamt',mt)}
     // xóa đánh dấu những gì đã gửi xong (thẻ sửa trong lúc đang đồng bộ thì giữ lại cho lần sau)
@@ -1410,7 +1500,7 @@ const SYNC=(()=>{
   }
   const soon=()=>{clearTimeout(timer);timer=setTimeout(run,12000)};
   function wrap(){
-    ['put','putMany','del','delDeck','all'].forEach(k=>raw[k]=ANKI[k]);
+    ['put','putMany','del','delDeck','all','getMedia'].forEach(k=>raw[k]=ANKI[k]);
     const mark=c=>{const t=Date.now();c.mt=t;dirty[c.id]=t};
     ANKI.put=async(store,v)=>{if(track&&store==='cards'){mark(v);saveDirty();soon()}if(track&&store==='decks'){metaDirty=Date.now();saveDirty();soon()}return raw.put(store,v)};
     ANKI.putMany=async(store,arr)=>{if(track&&store==='cards'){arr.forEach(mark);saveDirty();soon()}if(track&&store==='decks'){metaDirty=Date.now();saveDirty();soon()}return raw.putMany(store,arr)};
@@ -1430,7 +1520,7 @@ const SYNC=(()=>{
     window.addEventListener('online',run);
     document.addEventListener('click',e=>{if(e.target.closest('[data-sync]'))run()});
   }
-  return {start,run,chip:()=>!FB?'':`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st},get on(){return !!FB}};
+  return {start,run,putMedia,getMedia,chip:()=>!FB?'':`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st},get on(){return !!FB}};
 })();
 
 /* ---------- boot ---------- */

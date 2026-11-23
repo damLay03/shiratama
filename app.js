@@ -1108,7 +1108,7 @@ async function openBundle(code){
    Mỗi thẻ có mt (thời điểm sửa cuối); khi gộp, bản nào mới hơn thì thắng. */
 const SYNC=(()=>{
   // database riêng của Shiratama (dự án Firebase của anh Nhân). Để null thì tắt đồng bộ.
-  const FB=null; // ví dụ {apiKey:'...',project:'...'}
+  const FB={apiKey:'AIzaSyAfjtTIWLIyUp49h8tsitJjd2LWuHnqyxE',project:'shiratama-c5cc1'};
   const ROOT=FB?`projects/${FB.project}/databases/(default)/documents`:'';
   const API='https://firestore.googleapis.com/v1/';
   const NS=16;

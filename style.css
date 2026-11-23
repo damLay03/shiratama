@@ -436,3 +436,5 @@ body.editing .bedit{display:block}
 .hero-split{padding-right:0}
 @media (min-width:900px){.homegrid{grid-template-columns:minmax(340px,400px) minmax(0,1fr)}.hero .dog{--dw:96px;top:-14px;right:10px}.hero-n{padding-right:90px}}
 .hero .bubble{right:0;top:calc(100% + 2px);border-radius:16px 4px 16px 16px;transform-origin:top right}
+.ohint{font-size:12.5px;color:var(--ink3);line-height:1.45;margin:5px 2px 2px}
+.subnav{padding:2px 4px 8px;margin:0 -4px 10px}

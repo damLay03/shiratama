@@ -411,6 +411,7 @@ async function ankiBox(){
 /* ---------- tùy chọn deck (theo Anki) ---------- */
 const stepsTxt=a=>(a||[]).map(m=>m>=1440&&m%1440===0?(m/1440)+'d':m>=60&&m%60===0?(m/60)+'h':m+'m').join(' ');
 function parseSteps(s){return String(s||'').trim().split(/[\s,]+/).filter(Boolean).map(t=>{const m=t.match(/^(\d+(?:\.\d+)?)([smhd]?)$/i);if(!m)return null;const v=+m[1],u=(m[2]||'m').toLowerCase();return u==='s'?v/60:u==='h'?v*60:u==='d'?v*1440:v}).filter(x=>x!=null&&x>0)}
+const H=t=>`<div class="ohint">${t}</div>`;
 async function deckOptions(name){
   const st=await ankiState();const tree=deckTree(st);const node=tree.nodes[name];
   let d=node.deck;if(!d){d={id:'d'+Date.now(),name,at:Date.now(),cfgId:'1'};await ANKI.put('decks',d)}
@@ -423,42 +424,54 @@ async function deckOptions(name){
   const used=pid=>st.decks.filter(x=>String(x.cfgId||'1')===pid).length;
   const draw=()=>{const c=Object.assign({},PDEF,P[pid]);
     v.innerHTML=`<div class="panel wide opts-panel">
-   <div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px;overflow:hidden;text-overflow:ellipsis">${L('Tùy chọn','Options')}: ${esc(name)}</div><button class="iconbtn" id="ox">${I.x}</button></div>
-   <div class="tiny">${cards.length} ${L('thẻ','cards')} · ${cards.filter(c=>c.card.state===0).length} ${L('mới','new')} · ${cards.filter(c=>c.susp).length} ${L('tạm ẩn','suspended')}</div>
-   <div class="osec"><div class="ot">${L('Bộ cài đặt','Preset')}</div>
-     <div class="row">${opt('opre',pid,Object.entries(P).map(([k,x])=>[k,`${esc(x.name)} (${L('dùng cho','used by')} ${used(k)} deck)`]))}<button class="iconbtn sm" id="opmenu" aria-label="Preset">${I.dots}</button></div>
-     <div class="row wrapbtn" id="opacts" style="display:none;margin-top:8px"><button class="btn line sm" data-pa="add">${L('Thêm bộ mới','Add preset')}</button><button class="btn line sm" data-pa="clone">${L('Nhân bản','Clone')}</button><button class="btn line sm" data-pa="ren">${L('Đổi tên','Rename')}</button><button class="btn line sm" data-pa="del" style="color:var(--ng)">${L('Xóa bộ','Delete')}</button></div></div>
-   <div class="osec"><div class="ot">${L('Giới hạn mỗi ngày','Daily limits')}</div>
-     <label class="lab">${L('Thẻ mới mỗi ngày','New cards/day')}<input class="field" id="onew" type="number" min="0" value="${c.newDay}"></label>
-     <label class="lab">${L('Số lượt ôn tối đa mỗi ngày','Maximum reviews/day')}<input class="field" id="orev" type="number" min="0" value="${c.revDay}"></label></div>
-   <div class="osec"><div class="ot">${L('Thẻ mới','New cards')}</div>
-     <label class="lab">${L('Các bước học (ví dụ 1m 10m)','Learning steps (e.g. 1m 10m)')}<input class="field" id="olearn" value="${stepsTxt(c.learn)}"></label>
-     <label class="lab">${L('Khoảng cách khi tốt nghiệp (ngày)','Graduating interval (days)')}<input class="field" id="ograd" type="number" min="1" value="${c.gradIvl}"></label>
-     <label class="lab">${L('Thứ tự thẻ mới','New card order')}${opt('onord',c.newOrder,[['added',L('Theo thứ tự thêm','Order added')],['random',L('Ngẫu nhiên','Random')]])}</label></div>
-   <div class="osec"><div class="ot">${L('Thẻ quên','Lapses')}</div>
-     <label class="lab">${L('Các bước học lại','Relearning steps')}<input class="field" id="orelearn" value="${stepsTxt(c.relearn)}"></label>
-     <label class="lab">${L('Khoảng cách tối thiểu sau khi quên (ngày)','Minimum interval (days)')}<input class="field" id="ominl" type="number" min="1" value="${c.minLapse}"></label>
-     <label class="lab">${L('Ngưỡng thẻ khó nhớ (số lần quên)','Leech threshold (lapses)')}<input class="field" id="oleech" type="number" min="1" value="${c.leechN}"></label>
-     <label class="lab">${L('Khi thành thẻ khó nhớ','Leech action')}${opt('oleechA',c.leechAct,[['tag',L('Chỉ gắn tag leech','Tag only')],['suspend',L('Tạm ẩn thẻ','Suspend card')]])}</label></div>
-   <div class="osec"><div class="ot">${L('Thứ tự hiển thị','Display order')}</div>
-     <label class="lab">${L('Thẻ mới và thẻ ôn','New/review order')}${opt('omix',c.mix,[['mix',L('Trộn lẫn','Mix with reviews')],['before',L('Thẻ mới trước','Show before reviews')],['after',L('Thẻ mới sau','Show after reviews')]])}</label>
-     <label class="lab">${L('Thứ tự thẻ ôn','Review order')}${opt('orord',c.revOrder,[['due',L('Theo ngày đến hạn','Due date')],['random',L('Ngẫu nhiên','Random')],['retr',L('Dễ quên nhất trước','Ascending retrievability')]])}</label></div>
-   <div class="osec"><div class="ot">${L('Chôn thẻ anh em','Burying')}</div>
-     ${sw('obn',c.buryNew,L('Chôn thẻ mới cùng ghi chú','Bury new siblings'),L('Thẻ khác của cùng một ghi chú để sang ngày mai','Other cards of the same note wait until tomorrow'))}
-     ${sw('obr',c.buryRev,L('Chôn thẻ ôn cùng ghi chú','Bury review siblings'))}</div>
+   <div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px;overflow:hidden;text-overflow:ellipsis">${L('Cài đặt deck','Deck options')}: ${esc(name)}</div><button class="iconbtn" id="ox">${I.x}</button></div>
+   <div class="tiny">${cards.length} ${L('thẻ','cards')} · ${cards.filter(c=>c.card.state===0).length} ${L('thẻ chưa học','new')} · ${cards.filter(c=>c.susp).length} ${L('thẻ đang ẩn','suspended')}</div>
+   <div class="osec"><div class="ot">${L('Bộ cài đặt dùng chung','Preset')}</div>
+     <div class="row">${opt('opre',pid,Object.entries(P).map(([k,x])=>[k,`${esc(x.name)} (${L('đang dùng cho','used by')} ${used(k)} deck)`]))}<button class="iconbtn sm" id="opmenu" aria-label="Preset">${I.dots}</button></div>
+     ${H(L('Nhiều deck có thể dùng chung một bộ cài đặt. Sửa ở đây là các deck đó đổi theo.','Several decks can share one preset. Changes apply to all of them.'))}
+     <div class="row wrapbtn" id="opacts" style="display:none;margin-top:8px"><button class="btn line sm" data-pa="add">${L('Tạo bộ mới','Add preset')}</button><button class="btn line sm" data-pa="clone">${L('Sao chép bộ này','Clone')}</button><button class="btn line sm" data-pa="ren">${L('Đổi tên','Rename')}</button><button class="btn line sm" data-pa="del" style="color:var(--ng)">${L('Xóa bộ','Delete')}</button></div></div>
+   <div class="osec"><div class="ot">${L('Mỗi ngày học bao nhiêu','How much per day')}</div>
+     <label class="lab">${L('Số thẻ mới tối đa mỗi ngày','New cards per day')}<input class="field" id="onew" type="number" min="0" value="${c.newDay}"></label>
+     ${H(L('Thẻ mới là thẻ anh chưa học lần nào. Để 9999 là không giới hạn.','Cards you have never studied. 9999 means no limit.'))}
+     <label class="lab">${L('Số thẻ ôn tối đa mỗi ngày','Reviews per day')}<input class="field" id="orev" type="number" min="0" value="${c.revDay}"></label>
+     ${H(L('Thẻ ôn là thẻ đã học, đến ngày cần nhắc lại. Để 9999 là không giới hạn.','Cards you already learned that are due again. 9999 means no limit.'))}</div>
+   <div class="osec"><div class="ot">${L('Khi học thẻ mới','Learning new cards')}</div>
+     <label class="lab">${L('Hỏi lại sau bao lâu trong lúc học','Learning steps')}<input class="field" id="olearn" value="${stepsTxt(c.learn)}"></label>
+     ${H(L('Ví dụ "1m 10m": bấm Nhớ thì 1 phút sau hỏi lại, rồi 10 phút sau hỏi lần nữa. m = phút, h = giờ, d = ngày.','E.g. "1m 10m": asked again after 1 minute, then after 10 minutes. m = minutes, h = hours, d = days.'))}
+     <label class="lab">${L('Thuộc rồi thì mấy ngày sau mới ôn','Graduating interval (days)')}<input class="field" id="ograd" type="number" min="1" value="${c.gradIvl}"></label>
+     ${H(L('Sau khi qua hết các lần hỏi lại ở trên, thẻ sẽ quay lại sau từng này ngày.','After the steps above, the card comes back after this many days.'))}
+     <label class="lab">${L('Thẻ mới lấy theo thứ tự nào','New card order')}${opt('onord',c.newOrder,[['added',L('Thẻ thêm trước học trước','Order added')],['random',L('Ngẫu nhiên','Random')]])}</label></div>
+   <div class="osec"><div class="ot">${L('Khi quên thẻ đã thuộc','When you forget a card')}</div>
+     <label class="lab">${L('Hỏi lại sau bao lâu','Relearning steps')}<input class="field" id="orelearn" value="${stepsTxt(c.relearn)}"></label>
+     ${H(L('Ví dụ "10m": bấm Quên thì 10 phút sau thẻ hiện lại để học lại.','E.g. "10m": after Forgot, the card shows again 10 minutes later.'))}
+     <label class="lab">${L('Ôn lại sớm nhất sau mấy ngày','Minimum interval (days)')}<input class="field" id="ominl" type="number" min="1" value="${c.minLapse}"></label>
+     ${H(L('Học lại xong, thẻ quay lại không sớm hơn số ngày này.','After relearning, the card comes back no sooner than this.'))}
+     <label class="lab">${L('Quên bao nhiêu lần thì coi là thẻ khó','Hard card after this many lapses')}<input class="field" id="oleech" type="number" min="1" value="${c.leechN}"></label>
+     <label class="lab">${L('Gặp thẻ khó thì','Then')}${opt('oleechA',c.leechAct,[['tag',L('Chỉ đánh dấu "leech" để anh tìm lại','Only tag it "leech"')],['suspend',L('Ẩn thẻ đi, không hỏi nữa','Suspend it')]])}</label>
+     ${H(L('Thẻ khó thường do nội dung thẻ chưa rõ. Vào Duyệt thẻ, gõ is:leech để xem và sửa.','Hard cards are often unclear cards. Search is:leech in Browse to fix them.'))}</div>
+   <div class="osec"><div class="ot">${L('Thứ tự thẻ khi học','Order while studying')}</div>
+     <label class="lab">${L('Thẻ mới và thẻ ôn','New and review cards')}${opt('omix',c.mix,[['mix',L('Xen kẽ nhau','Mixed')],['before',L('Thẻ mới trước, thẻ ôn sau','New first')],['after',L('Thẻ ôn trước, thẻ mới sau','Reviews first')]])}</label>
+     <label class="lab">${L('Thẻ ôn hiện theo thứ tự','Review order')}${opt('orord',c.revOrder,[['due',L('Thẻ đến hạn trước hiện trước','By due date')],['random',L('Ngẫu nhiên','Random')],['retr',L('Thẻ sắp quên nhất hiện trước','Most likely forgotten first')]])}</label></div>
+   <div class="osec"><div class="ot">${L('Thẻ cùng một từ','Cards from the same note')}</div>
+     ${sw('obn',c.buryNew,L('Không hỏi 2 thẻ mới của cùng một từ trong một ngày','Hold back sibling new cards'),L('Ví dụ một từ có thẻ Nhật→Việt và Việt→Nhật thì thẻ còn lại để mai.','E.g. if a word has two cards, the other one waits until tomorrow.'))}
+     ${sw('obr',c.buryRev,L('Áp dụng giống vậy cho thẻ ôn','Same for review cards'))}</div>
    <div class="osec"><div class="ot">${L('Đồng hồ','Timer')}</div>
-     ${sw('otimer',c.showTimer,L('Hiện đồng hồ khi học','Show answer timer'))}
-     <label class="lab">${L('Thời gian trả lời tối đa được tính (giây)','Maximum answer seconds')}<input class="field" id="ocap" type="number" min="5" value="${c.capSec}"></label></div>
-   <div class="osec"><div class="ot">FSRS</div>
-     <label class="lab">${L('Tỉ lệ nhớ mong muốn','Desired retention')} <b id="oretv">${Math.round(c.ret*100)}%</b><input type="range" id="oret" min="70" max="99" value="${Math.round(c.ret*100)}"></label>
-     <label class="lab">${L('Tham số FSRS (để trống = mặc định)','FSRS parameters (blank = default)')}<input class="field" id="ow" value="${esc(c.w)}" placeholder="0.40255, 1.18385, …"></label></div>
-   <div class="osec"><div class="ot">${L('Nâng cao','Advanced')}</div>
-     <label class="lab">${L('Khoảng cách tối đa (ngày)','Maximum interval (days)')}<input class="field" id="omax" type="number" min="1" value="${c.maxIvl}"></label></div>
+     ${sw('otimer',c.showTimer,L('Hiện thời gian đang nghĩ trên mỗi thẻ','Show a timer on each card'))}
+     <label class="lab">${L('Nghĩ lâu hơn số giây này thì chỉ tính bằng số này','Count at most this many seconds')}<input class="field" id="ocap" type="number" min="5" value="${c.capSec}"></label>
+     ${H(L('Để thống kê thời gian học không bị đội lên khi anh bỏ đi giữa chừng.','Keeps study time stats sane if you walk away mid-card.'))}</div>
+   <div class="osec"><div class="ot">${L('Cách tính lịch ôn','Scheduling')}</div>
+     <label class="lab">${L('Muốn nhớ được bao nhiêu phần trăm thẻ','Target memory rate')} <b id="oretv">${Math.round(c.ret*100)}%</b><input type="range" id="oret" min="70" max="99" value="${Math.round(c.ret*100)}"></label>
+     ${H(L('Cao hơn thì ôn dày hơn, nhớ chắc hơn nhưng mỗi ngày nhiều thẻ hơn. 90% là mức Anki khuyên dùng.','Higher means more reviews per day but better memory. 90% is the usual choice.'))}
+     <label class="lab">${L('Bộ số của thuật toán FSRS (không cần đụng)','FSRS parameters (optional)')}<input class="field" id="ow" value="${esc(c.w)}" placeholder="${L('Để trống là dùng mặc định','Blank = default')}"></label>
+     ${H(L('Anki tính lịch ôn bằng thuật toán FSRS. Nếu anh đã có bộ số tối ưu trong Anki thì dán vào đây, không thì để trống.','Paste optimized parameters from Anki if you have them, otherwise leave blank.'))}
+     <label class="lab">${L('Lâu nhất bao nhiêu ngày mới ôn một lần','Maximum interval (days)')}<input class="field" id="omax" type="number" min="1" value="${c.maxIvl}"></label>
+     ${H(L('Dù thẻ dễ đến đâu cũng không để lâu hơn số ngày này.','Even easy cards come back within this many days.'))}</div>
    <div class="osec"><div class="ot">${L('Deck này','This deck')}</div>
      <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="oname" value="${esc(name)}"></label>
-     ${sw('osub',false,L('Áp dụng bộ cài đặt cho cả deck con','Apply preset to all subdecks'))}</div>
-   <div class="osave"><button class="btn bee" id="osave" style="width:100%">${L('Lưu','Save')}</button>
-   <div class="row wrapbtn" style="margin-top:10px"><button class="btn line sm" id="obrowse">${L('Xem thẻ','Browse')}</button><button class="btn line sm" id="oadd">${L('Thêm thẻ','Add')}</button><button class="btn line sm" id="ostat">${L('Thống kê','Stats')}</button><button class="btn line sm" id="oexp">${L('Xuất file','Export')}</button><button class="btn line sm" id="odel" style="color:var(--ng)">${L('Xóa deck','Delete')}</button></div></div>
+     ${H(L('Dùng :: để làm deck con, ví dụ "FPT::JPD316".','Use :: for subdecks, e.g. "FPT::JPD316".'))}
+     ${sw('osub',false,L('Cho các deck con dùng chung bộ cài đặt này','Apply preset to all subdecks'))}</div>
+   <div class="row wrapbtn" style="margin:6px 0 4px"><button class="btn line sm" id="obrowse">${L('Xem thẻ','Browse')}</button><button class="btn line sm" id="oadd">${L('Thêm thẻ','Add')}</button><button class="btn line sm" id="ostat">${L('Thống kê','Stats')}</button><button class="btn line sm" id="oexp">${L('Xuất file','Export')}</button><button class="btn line sm" id="odel" style="color:var(--ng)">${L('Xóa deck','Delete')}</button></div>
+   <div class="osave"><button class="btn bee" id="osave" style="width:100%">${L('Lưu','Save')}</button></div>
   </div>`;
     const q=s=>v.querySelector(s);
     q('#ox').onclick=close;

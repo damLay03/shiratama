@@ -22,7 +22,8 @@ const LL=a=>a?L(a[0],a[1]):'';
 const secName=k=>LL(SECN[k]);
 const partName=p=>LL(PARTN[p.key])||p.name;
 const typeName=q=>LL(TYPEN[q.sec+q.m])||q.type;
-const examTitle=ex=>L('Đề chính thức JLPT N3 (2018)','Official JLPT N3 sample test (2018)');
+const examTitle=ex=>ex.vi?L(ex.vi,ex.en||ex.vi):L('Đề mẫu chính thức JLPT N3 (2018)','Official JLPT N3 sample test (2018)');
+const examsSorted=()=>DATA.exams.slice().sort((a,b)=>(b.date||'0').localeCompare(a.date||'0'));
 const SIZES=[18,20,22,25,28,32,36];
 
 /* ---------- state ---------- */
@@ -106,11 +107,23 @@ const DOG_LINES=()=>[L('Gâu! Học tiếp nha anh.','Woof! Let’s keep going.'
 /* ---------- audio ---------- */
 let AU=null,AUQ=null,AUTick=null;
 function stopAudio(){if(AU)AU.pause();clearInterval(AUTick);AUQ=null;const b=$('#aubtn');if(b)b.innerHTML=I.play}
-function playSeg(q,restart){
+const AUENC={};
+async function encAudio(name){
+  if(AUENC[name])return AUENC[name];
+  return AUENC[name]=(async()=>{const buf=new Uint8Array(await fetch('data/audio/'+name+'.bin').then(r=>{if(!r.ok)throw new Error('audio '+r.status);return r.arrayBuffer()}));
+    const key=await deriveKey(ls.get('shiratama-code',''),buf.slice(0,16));
+    const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:buf.slice(16,28)},key,buf.slice(28));
+    return URL.createObjectURL(new Blob([plain],{type:'audio/mpeg'}))})().catch(e=>{delete AUENC[name];throw e});
+}
+async function playSeg(q,restart){
   if(!AU){AU=new Audio();AU.preload='auto'}
+  let src=q.audio;
+  if(src.startsWith('enc:')){const bt=$('#aubtn');if(bt&&!AUENC[src.slice(4)])bt.classList.add('loading');
+    try{src=await encAudio(src.slice(4))}catch(e){console.warn(e);toast(L('Chưa tải được file nghe','Could not load the audio'));if(bt)bt.classList.remove('loading');return}
+    if(bt)bt.classList.remove('loading')}
   const [a,b]=q.t;
   const go=()=>{if(restart||AU.currentTime<a||AU.currentTime>=b-0.2)AU.currentTime=a;AU.play().catch(()=>toast(L('Không phát được âm thanh','Could not play audio')))};
-  if(AU.dataset.src!==q.audio){AU.src=q.audio;AU.dataset.src=q.audio;AU.addEventListener('loadedmetadata',go,{once:true});AU.load()}else go();
+  if(AU.dataset.src!==q.audio){AU.src=src;AU.dataset.src=q.audio;AU.addEventListener('loadedmetadata',go,{once:true});AU.load()}else go();
   AUQ=q.id;const bt=$('#aubtn');if(bt)bt.innerHTML=I.pause;
   clearInterval(AUTick);AUTick=setInterval(()=>{
     const tr=$('#autrack');if(tr)tr.style.width=Math.min(100,Math.max(0,(AU.currentTime-a)/(b-a)*100))+'%';
@@ -248,18 +261,20 @@ function lockScreen(err){
 
 /* ---------- đề thi ---------- */
 function examList(){
-  const ex=DATA.exams[0];
+  const exs=examsSorted();const ex=exs.find(e=>e.id===S.exSel)||exs[0];
   const hist=(S.exams[ex.id]||[]).slice(-5).reverse();
   const due=dueIds().length;
   shell(`${header()}
   <div class="h">${L('Luyện theo phần','Practice by section')}</div>
   <div class="secgrid">${Object.keys(SEC).map(k=>{const qs=allBy(k);const t=qs.filter(q=>S.ans[q.id]).length;return `<button class="sec" data-prac="${k}"><div style="font-weight:800">${secName(k)}</div><div class="tiny" style="margin-top:6px">${t}/${qs.length} ${L('câu đã làm','done')}</div></button>`}).join('')}</div>
-  <div class="h">${L('Đề thi thật','Real test')}</div>
-  <div class="card"><div style="font-size:19px;font-weight:800">${examTitle(ex)}</div><div class="tiny" style="margin-top:2px">${L('Nguồn: jlpt.jp · đáp án chính thức','Source: jlpt.jp · official answers')}</div></div>
+  <div class="h">${L('Đề thi thật','Real tests')}</div>
+  <div class="exchips">${exs.map(e=>{const n=e.qs.length,d=e.qs.filter(q=>S.ans[q.id]).length;return `<button class="exchip ${e===ex?'on':''}" data-exsel="${esc(e.id)}"><b>${esc(e.short||L('Đề mẫu 2018','Sample 2018'))}</b><small>${d?`${d}/${n}`:L('chưa làm','new')}</small></button>`}).join('')}</div>
+  <div class="card"><div style="font-size:19px;font-weight:800">${esc(examTitle(ex))}</div><div class="tiny" style="margin-top:2px">${esc(ex.note?L(ex.note,ex.note):L('Nguồn: jlpt.jp · đáp án chính thức','Source: jlpt.jp · official answers'))}</div></div>
   ${ex.parts.map((p,i)=>{const qs=partQs(ex,p);return `<div class="card"><div style="font-size:17px;font-weight:800">${partName(p)}</div><div class="tiny">${qs.length} ${L('câu','questions')} · ${p.min} ${L('phút','min')}</div>
    <div class="row" style="margin-top:12px"><button class="btn bee" data-ex="${i}">${L('Thi thật','Timed test')}</button><button class="btn line" data-exp="${i}">${L('Luyện từng câu','One by one')}</button></div></div>`}).join('')}
   ${hist.length?`<div class="h">${L('Lần làm gần đây','Recent attempts')}</div><div class="card">${hist.map(h=>`<div class="list-item"><div class="grow"><div>${esc(partName(ex.parts.find(p=>p.name===h.name)||{name:h.name}))}</div><div class="tiny">${new Date(h.at).toLocaleString(L('vi-VN','en-GB'))}</div></div><b>${h.c}/${h.n}</b></div>`).join('')}</div>`:''}
-  <p class="tiny center">${L('Âm thanh phát trực tiếp từ jlpt.jp.','Audio streams from jlpt.jp.')}</p>`);
+  `);
+  $$('[data-exsel]').forEach(b=>b.onclick=()=>{S.exSel=b.dataset.exsel;save();examList()});
   $$('[data-prac]').forEach(b=>b.onclick=()=>startPractice(b.dataset.prac));
   $$('[data-ex]').forEach(b=>b.onclick=()=>startExam(ex,ex.parts[+b.dataset.ex],true));
   $$('[data-exp]').forEach(b=>b.onclick=()=>startExam(ex,ex.parts[+b.dataset.exp],false));
@@ -288,7 +303,8 @@ function renderSession(){
   const pick=SS.picks[q.id], shown=SS.shown[q.id];
   const hasP=q.p&&ex.passages[q.p];
   const hideStem=q.sec==='choukai'&&!shown&&(exam||q.m>=3);
-  const stem=hideStem?`<div class="stem muted" style="font-size:15px">${L('Nghe để biết câu hỏi','Listen for the question')}</div>`:`<div class="stem">${rich(q.q)}</div>`;
+  const qimg=q.img&&ex.imgs&&ex.imgs[q.img]?`<img class="qimg" src="${ex.imgs[q.img]}" alt="">`:'';
+  const stem=qimg+(hideStem?`<div class="stem muted" style="font-size:15px">${L('Nghe để biết câu hỏi','Listen for the question')}</div>`:`<div class="stem">${rich(q.q)}</div>`);
   const opts=q.o.map((o,k)=>{
     let cls='opt';
     if(shown){if(k===q.a)cls+=' right';else if(k===pick)cls+=' wrong';else cls+=' dim'}

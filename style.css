@@ -438,3 +438,12 @@ body.editing .bedit{display:block}
 .hero .bubble{right:0;top:calc(100% + 2px);border-radius:16px 4px 16px 16px;transform-origin:top right}
 .ohint{font-size:12.5px;color:var(--ink3);line-height:1.45;margin:5px 2px 2px}
 .subnav{padding:2px 4px 8px;margin:0 -4px 10px}
+/* màn máy tính hẹp (900–1279px): xếp một cột để tên deck không bị che */
+@media (min-width:900px) and (max-width:1279px){
+  .homegrid{grid-template-columns:minmax(0,1fr)}
+  .hcol{position:static;display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);align-items:start}
+  .hcol .tools{grid-template-columns:1fr 1fr}
+  .hcol #impMsg{grid-column:1/-1}
+}
+@media (min-width:1280px){.homegrid{grid-template-columns:minmax(340px,400px) minmax(0,1fr)}}
+.deckrow .dn{min-width:90px}

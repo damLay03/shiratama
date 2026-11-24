@@ -243,6 +243,7 @@ function sys(){
    <div class="card"><div class="ot">${L('Ngày mới bắt đầu lúc','New day starts at')}</div>
     <div class="row"><button class="btn line" id="dhm">−</button><b class="grow center" id="dhv" style="font-size:22px">${dayHour()}:00</b><button class="btn line" id="dhp">+</button></div>
     <div class="tiny" style="margin-top:8px">${L('Đến giờ này app mới tính sang ngày mới: mở thẻ mới và đếm lại số thẻ ôn trong ngày. Hay thức khuya thì để muộn hơn.','At this hour the app rolls over to a new day: new cards open and daily counts reset. Night owls can set it later.')}</div></div>
+   ${PAD.settingsHTML()}
    <div class="card"><div class="ot">${L('Dữ liệu','Data')}</div>
     <div class="kv"><span>${L('Bộ thẻ Anki cập nhật','Anki collection updated')}</span><b>${ls.get('shiratama-colv')?new Date(ls.get('shiratama-colv')*1000).toLocaleDateString(L('vi-VN','en-GB')):'—'}</b></div>
     <div class="tiny" style="margin:6px 0 12px">${L('Tiến độ học lưu trên máy này, đồng thời được gửi lên kho chung. Điện thoại và máy tính nhập cùng mã sẽ thấy cùng tiến độ.','Progress is saved here and synced. Devices with the same code share progress.')}</div>
@@ -261,7 +262,7 @@ function sys(){
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
     $('#sm').onclick=()=>{S.size=Math.max(0,S.size-1);save();applyLook();draw()};
     $('#sp').onclick=()=>{S.size=Math.min(SIZES.length-1,S.size+1);save();applyLook();draw()};
-    $('#sexd').onclick=()=>examDayDialog(draw);
+    $('#sexd').onclick=()=>examDayDialog(draw);PAD.bindSettings(draw);
     const dh=d=>{S.dayHour=(dayHour()+d+24)%24;save();$('#dhv').textContent=S.dayHour+':00'};$('#dhm').onclick=()=>dh(-1);$('#dhp').onclick=()=>dh(1);
     $('#srng').oninput=e=>{S.size=+e.target.value;save();applyLook();const c=e.target.closest('.card');c.querySelector('.jp').style.fontSize=SIZES[S.size]+'px';c.querySelector('b.tiny').textContent=SIZES[S.size]+'px'};
     $('#slock').onclick=()=>{if(!confirm(L('Khóa app? Lần sau phải nhập lại mã. Tiến độ học vẫn giữ nguyên.','Lock the app? You will need the code again. Progress is kept.')))return;localStorage.removeItem('shiratama-code');DATA=null;render()};
@@ -1643,6 +1644,112 @@ const SYNC=(()=>{
   }
   return {start,run,putMedia,getMedia,chip:()=>!FB?'':`<button class="syncchip ${st.state}" data-sync>${chipInner()}</button>`,detail:()=>`<div id="sysync">${detail()}</div>`,get state(){return st},get on(){return !!FB}};
 })();
+
+/* ---------- tay cầm (controller), giống addon Contanki của Anki ---------- */
+const PAD=(()=>{
+  const BTN=['A','B','X','Y','LB','RB','LT','RT','View','Menu','L3','R3','↑','↓','←','→','Xbox'];
+  const CTX=[['all',L('Mọi màn','Everywhere')],['q',L('Ôn thẻ: mặt trước','Review: question')],['a',L('Ôn thẻ: mặt sau','Review: answer')],['flip',L('Deck tự lướt','Flip deck')]];
+  const ACT={
+    none:[L('Không làm gì','Nothing')],
+    select:[L('Bấm mục đang chọn','Press selected')],back:[L('Quay lại / thoát','Back / exit')],
+    up:[L('Chọn mục trên','Move up')],down:[L('Chọn mục dưới','Move down')],left:[L('Chọn mục trái','Move left')],right:[L('Chọn mục phải','Move right')],
+    flip:[L('Lật thẻ','Flip card')],good:[L('Nhớ','Remembered')],again:[L('Quên','Forgot')],undo:[L('Hoàn tác','Undo')],
+    next:[L('Thẻ sau','Next card')],prev:[L('Thẻ trước','Previous card')],star:[L('Gắn sao ★','Star ★')],
+    sizeup:[L('Chữ to hơn','Bigger text')],sizedn:[L('Chữ nhỏ hơn','Smaller text')],menu:[L('Mở menu ⋯','Open ⋯ menu')],
+    tabn:[L('Tab kế tiếp','Next tab')],tabp:[L('Tab trước','Previous tab')]};
+  // mặc định theo bộ nút anh đang dùng trong Contanki (Xbox Series)
+  const DEF={all:{0:'select',1:'back',4:'tabp',5:'tabn',6:'sizedn',7:'sizeup',8:'back',9:'menu',12:'up',13:'down',14:'left',15:'right'},
+    q:{0:'flip',1:'none',2:'none',3:'none',4:'undo',5:'none'},a:{0:'good',1:'again',2:'again',3:'good',4:'undo',5:'none'},
+    flip:{0:'flip',1:'back',3:'star',12:'star',14:'prev',15:'next',4:'prev',5:'next'}};
+  const cfg=()=>S.pad||{};
+  const on=()=>cfg().on!==0;
+  const map=c=>Object.assign({},DEF[c]||{},(cfg().b||{})[c]||{});
+  let shown=0,raf=0,prev=[],held={},cap=null,lastId='',hint=null,focusEl=null,ax=[0,0,0,0];
+  const pads=()=>[...(navigator.getGamepads?navigator.getGamepads():[])].filter(g=>g&&g.connected);
+  function ctx(){if(document.querySelector('.veil'))return 'all';if(AK&&AK.list&&AK.list[AK.i])return AK.show?'a':'q';if(FV&&FV.view!=='list'&&FV.key)return 'flip';return 'all'}
+  const vis=el=>{const r=el.getBoundingClientRect();return r.width>2&&r.height>2&&r.bottom>0&&r.top<innerHeight&&getComputedStyle(el).visibility!=='hidden'};
+  function items(){const root=[...document.querySelectorAll('.veil')].pop()||document;
+    const all=[...root.querySelectorAll('button,a[href],input,select,textarea,[data-tab],[data-sub],.dn,[tabindex]')].concat([...root.querySelectorAll('#app div,#app li,#app span')].filter(e=>e.onclick));
+    return all.filter(e=>!e.disabled&&vis(e)&&!e.closest('.szpop:not(.open)'))}
+  function mark(el){if(focusEl)focusEl.classList.remove('padfocus');focusEl=el;if(!el)return;el.classList.add('padfocus');try{el.focus({preventScroll:true})}catch(e){}el.scrollIntoView({block:'nearest',behavior:'smooth'})}
+  function move(dx,dy){const list=items();if(!list.length)return;
+    if(!focusEl||!document.contains(focusEl)||!list.includes(focusEl)){mark(list.find(e=>{const r=e.getBoundingClientRect();return r.top>=0})||list[0]);return}
+    const a=focusEl.getBoundingClientRect(),ac=[a.left+a.width/2,a.top+a.height/2];let best=null,bs=1e9;
+    list.forEach(e=>{if(e===focusEl||focusEl.contains(e)||e.contains(focusEl))return;const r=e.getBoundingClientRect(),c=[r.left+r.width/2,r.top+r.height/2];
+      const d=[c[0]-ac[0],c[1]-ac[1]];const main=dx?d[0]*dx:d[1]*dy,side=dx?Math.abs(d[1]):Math.abs(d[0]);if(main<=4)return;const sc=main+side*2.5;if(sc<bs){bs=sc;best=e}});
+    if(best)mark(best);else window.scrollBy({top:dy*160,behavior:'smooth'})}
+  const key=k=>{const e={key:k,target:document.body,preventDefault(){},ctrlKey:false,metaKey:false};if(AK&&AK.key)AK.key(e);else if(FV&&FV.key)FV.key(e)};
+  const click=sel=>{const el=[...document.querySelectorAll(sel)].find(vis);if(el){el.click();return true}return false};
+  function back(){const v=[...document.querySelectorAll('.veil')].pop();if(v){const x=v.querySelector('.panel .iconbtn')||v.querySelector('.iconbtn');if(x)x.click();else v.remove();return}
+    const p=document.querySelector('.szpop.open,#akpop.open');if(p){p.classList.remove('open');return}
+    click('#fvq,#akq,#quit,#back,#eclose,#edx,#akb')}
+  function tab(d){if(AK||SS||FV||document.querySelector('.veil'))return;const O=['home','browse','stats','exam','examstats','sys'];let i=O.indexOf(TAB);if(i<0)i=0;const n=O[(i+d+O.length)%O.length];
+    const sb=document.querySelector(`[data-sub="${n}"]`);if(sb){sb.click();return}
+    const mt=n==='browse'||n==='stats'?'home':n==='examstats'?'exam':n;const tb=document.querySelector(`[data-tab="${mt}"]`);if(tb)tb.click();
+    if(TAB!==n){const s2=document.querySelector(`[data-sub="${n}"]`);if(s2)s2.click()}}
+  function size(d){S.size=Math.max(0,Math.min(SIZES.length-1,S.size+d));save();applyLook();const v=document.getElementById('szv');if(v)v.textContent=SIZES[S.size]+'px';toast(SIZES[S.size]+'px')}
+  function run(a){
+    switch(a){
+      case 'select':if(focusEl&&document.contains(focusEl)&&vis(focusEl))focusEl.click();else move(0,1);break;
+      case 'back':back();break;
+      case 'up':move(0,-1);break;case 'down':move(0,1);break;case 'left':move(-1,0);break;case 'right':move(1,0);break;
+      case 'flip':key(' ');break;case 'good':key('3');break;case 'again':key('1');break;
+      case 'undo':if(AK)key('Backspace');break;
+      case 'next':key('ArrowRight');break;case 'prev':key('ArrowLeft');break;case 'star':key('s');break;
+      case 'sizeup':size(1);break;case 'sizedn':size(-1);break;
+      case 'menu':click('#akmenu,#opmenu,[data-menu],.dots');break;
+      case 'tabn':tab(1);break;case 'tabp':tab(-1);break}}
+  function press(b){if(cap){const c=cap;cap=null;c(b);return}if(!on())return;
+    const c=ctx();let a=c!=='all'?map(c)[b]:undefined;if(a===undefined||a==='inherit')a=map('all')[b];
+    if(a&&a!=='none'){run(a);shown=Date.now();legend()}}
+  function scrollBy(dy){if(!on())return;const f=[...document.querySelectorAll('.fvstage .face')].find(e=>vis(e)&&e.scrollHeight>e.clientHeight+2);
+    const tgt=FV&&f&&f.scrollHeight>f.clientHeight?f:(document.querySelector('.sess')&&document.querySelector('.sess').scrollHeight>document.querySelector('.sess').clientHeight?document.querySelector('.sess'):null);
+    if(tgt)tgt.scrollTop+=dy;else window.scrollBy(0,dy)}
+  function tick(t){raf=0;const g=pads()[0];if(!g){prev=[];return}
+    if(g.id!==lastId){lastId=g.id;shown=Date.now();toast(L('Đã nhận tay cầm','Controller connected'));legend()}
+    g.buttons.forEach((b,i)=>{const p=b.pressed||b.value>.5;
+      if(p&&!prev[i]){held[i]=t;press(i)}
+      else if(p&&prev[i]&&i>=12&&i<=15&&t-held[i]>380){held[i]=t-300;press(i)}
+      prev[i]=p});
+    const dz=.18,ys=[g.axes[1]||0,g.axes[3]||0];ys.forEach(y=>{if(Math.abs(y)>dz)scrollBy(Math.sign(y)*(Math.abs(y)-dz)*28)});
+    const x=g.axes[0]||0,y0=g.axes[1]||0;// cần trái gạt ngang = như phím trái/phải
+    const st=Math.abs(x)>.6?(x>0?15:14):0;if(st&&!ax[0]){ax[0]=1;press(st)}else if(!st)ax[0]=0;
+    raf=requestAnimationFrame(tick)}
+  function start(){if(!raf&&pads().length)raf=requestAnimationFrame(tick)}
+  addEventListener('gamepadconnected',start);addEventListener('gamepaddisconnected',()=>{lastId='';if(!pads().length){toast(L('Đã ngắt tay cầm','Controller disconnected'));legend()}});
+  setInterval(start,1500);
+  const chip=b=>`<span class="pbtn pb${b}">${BTN[b]||('#'+b)}</span>`;
+  function legend(){const want=on()&&cfg().hint!==0&&pads().length&&(ctx()!=='all')&&Date.now()-shown<5000;
+    if(!want){if(hint){hint.remove();hint=null}return}
+    if(!hint){hint=document.createElement('div');hint.className='padhint';document.body.appendChild(hint)}
+    const c=ctx(),m=map(c),seen=new Set(),rows=Object.entries(m).filter(([b,a])=>a&&a!=='none'&&a!=='inherit'&&!seen.has(a)&&seen.add(a)).slice(0,5);
+    hint.classList.toggle('hi',c==='q'||c==='a');hint.innerHTML=rows.map(([b,a])=>`<span>${chip(+b)}${esc(ACT[a]?ACT[a][0]:a)}</span>`).join('')}
+  setInterval(legend,800);
+  function settingsHTML(){const g=pads()[0];
+    return `<div class="card"><div class="ot">${L('Tay cầm chơi game','Game controller')}</div>
+    <div class="kv"><span>${L('Trạng thái','Status')}</span><b>${g?esc(g.id.replace(/\s*\(.*$/,'').slice(0,40)):L('chưa thấy, cắm vào rồi bấm 1 nút','not found, plug in and press a button')}</b></div>
+    <div class="seg" style="margin-top:10px">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-pon="${k}" class="${(on()?1:0)===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="tiny" style="margin-top:12px">${L('Bảng nút gợi ý khi học','Button hints while studying')}</div><div class="seg" style="margin-top:6px">${[[1,L('Hiện','Show')],[0,L('Ẩn','Hide')]].map(([k,l])=>`<button data-phi="${k}" class="${(cfg().hint===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
+    <button class="btn line" id="pmap" style="margin-top:12px">${L('Gán nút','Button mapping')}</button>
+    <div class="tiny" style="margin-top:8px">${L('Mặc định giống Contanki: A lật thẻ / Nhớ, B Quên, LB hoàn tác, mũi tên chọn mục, cần gạt để cuộn, View để thoát.','Defaults follow Contanki: A flip / remembered, B forgot, LB undo, D-pad to move, sticks scroll, View exits.')}</div></div>`}
+  function bindSettings(redraw){
+    document.querySelectorAll('[data-pon]').forEach(b=>b.onclick=()=>{S.pad=Object.assign({},cfg(),{on:+b.dataset.pon});save();legend();redraw()});
+    document.querySelectorAll('[data-phi]').forEach(b=>b.onclick=()=>{S.pad=Object.assign({},cfg(),{hint:+b.dataset.phi});save();legend();redraw()});
+    const m=document.getElementById('pmap');if(m)m.onclick=mapDialog}
+  function mapDialog(){let cur='all';const v=document.createElement('div');v.className='veil';document.body.appendChild(v);
+    const draw=()=>{const m=map(cur);const used=[...new Set(Object.keys(DEF.all).concat(Object.keys(DEF[cur]||{}),Object.keys(m)))].map(Number).sort((a,b)=>a-b);
+      v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:10px"><div class="grow" style="font-weight:800;font-size:18px">${L('Gán nút tay cầm','Controller buttons')}</div><button class="iconbtn" id="pmx">${I.x}</button></div>
+      <div class="seg wrapseg">${CTX.map(([k,l])=>`<button data-pc="${k}" class="${k===cur?'on':''}">${esc(l)}</button>`).join('')}</div>
+      <div class="pmrows">${used.map(b=>`<div class="pmrow">${chip(b)}<select data-pb="${b}" class="field">${(cur==='all'?[]:[['inherit',L('Như "Mọi màn"','Same as Everywhere')]]).concat(Object.entries(ACT).map(([k,[l]])=>[k,l])).map(([k,l])=>`<option value="${k}" ${((m[b]===undefined||m[b]==='inherit')?(cur==='all'?k==='none':k==='inherit'):m[b]===k)?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`).join('')}</div>
+      <div class="row wrapbtn" style="margin-top:12px"><button class="btn line" id="padd">${L('Thêm nút: bấm trên tay cầm','Add: press a button')}</button><button class="btn line" id="prst">${L('Về mặc định','Reset')}</button></div></div>`;
+      v.querySelector('#pmx').onclick=()=>v.remove();
+      v.querySelectorAll('[data-pc]').forEach(b=>b.onclick=()=>{cur=b.dataset.pc;draw()});
+      v.querySelectorAll('[data-pb]').forEach(s=>s.onchange=()=>{const P=Object.assign({},cfg());P.b=Object.assign({},P.b||{});P.b[cur]=Object.assign({},P.b[cur]||{});
+        P.b[cur][s.dataset.pb]=s.value;S.pad=P;save()});
+      v.querySelector('#padd').onclick=e=>{e.target.textContent=L('Đang chờ bạn bấm nút…','Press a button…');cap=b=>{const P=Object.assign({},cfg());P.b=Object.assign({},P.b||{});P.b[cur]=Object.assign({},P.b[cur]||{});if(!(b in map(cur)))P.b[cur][b]=cur==='all'?'none':'inherit';S.pad=P;save();draw()};start()};
+      v.querySelector('#prst').onclick=()=>{const P=Object.assign({},cfg());if(P.b)delete P.b[cur];S.pad=P;save();draw()}};
+    draw()}
+  return {settingsHTML,bindSettings,start}})();
 
 /* ---------- boot ---------- */
 (async()=>{

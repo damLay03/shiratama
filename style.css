@@ -987,3 +987,6 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .padcursor{position:fixed;left:-3px;top:-2px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .25s;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
 .padcursor.on{opacity:1}.padcursor svg{transition:transform .12s}.padcursor.tap svg{transform:scale(.8)}
 .padhover{box-shadow:0 0 0 3px rgba(240,180,40,.55)!important;border-radius:12px}
+.prog span.akleft{left:0;right:auto;font-size:13px;color:var(--ink2);white-space:nowrap}
+.prog .akleft b{font-size:14px;margin-left:10px;margin-right:2px}.prog .akleft b:first-child{margin-left:0}
+.prog .akleft .cn{color:var(--s1)}.prog .akleft .cl{color:var(--s2)}.prog .akleft .cr{color:var(--s3)}

@@ -1166,7 +1166,7 @@ function renderAnki(){
        <button id="akmu" class="${MUSIC.on?'on':''}">${I.note}<span>${L('Nhạc nền','Music')}</span></button>
        <button id="akedit">${I.pen}<span>${L('Sửa thẻ này','Edit this card')}</span></button>
      </div></div>
-   <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
+   <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span class="akleft"><b class="cn">${cnt.n}</b> ${L('mới','new')}<b class="cl">${cnt.l}</b> ${L('đang học','learning')}<b class="cr">${cnt.r}</b> ${L('ôn','review')}</span><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
    ${autoBarHTML(AK.auto,P.autoQ,P.autoA,P.autoAct,{grade:true})}
    <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);

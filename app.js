@@ -1651,14 +1651,14 @@ const PAD=(()=>{
   const CTX=[['all',L('Mọi màn','Everywhere')],['q',L('Ôn thẻ: mặt trước','Review: question')],['a',L('Ôn thẻ: mặt sau','Review: answer')],['flip',L('Deck tự lướt','Flip deck')]];
   const ACT={
     none:[L('Không làm gì','Nothing')],
-    select:[L('Bấm mục đang chọn','Press selected')],back:[L('Quay lại / thoát','Back / exit')],
+    select:[L('Bấm mục đang chọn','Press selected')],click:[L('Click chuột tại con trỏ','Mouse click at cursor')],back:[L('Quay lại / thoát','Back / exit')],
     up:[L('Chọn mục trên','Move up')],down:[L('Chọn mục dưới','Move down')],left:[L('Chọn mục trái','Move left')],right:[L('Chọn mục phải','Move right')],
     flip:[L('Lật thẻ','Flip card')],good:[L('Nhớ','Remembered')],again:[L('Quên','Forgot')],undo:[L('Hoàn tác','Undo')],
     next:[L('Thẻ sau','Next card')],prev:[L('Thẻ trước','Previous card')],star:[L('Gắn sao ★','Star ★')],
     sizeup:[L('Chữ to hơn','Bigger text')],sizedn:[L('Chữ nhỏ hơn','Smaller text')],menu:[L('Mở menu ⋯','Open ⋯ menu')],
     tabn:[L('Tab kế tiếp','Next tab')],tabp:[L('Tab trước','Previous tab')]};
   // mặc định theo bộ nút anh đang dùng trong Contanki (Xbox Series)
-  const DEF={all:{0:'select',1:'back',4:'tabp',5:'tabn',6:'sizedn',7:'sizeup',8:'back',9:'menu',12:'up',13:'down',14:'left',15:'right'},
+  const DEF={all:{11:'click',0:'select',1:'back',4:'tabp',5:'tabn',6:'sizedn',7:'sizeup',8:'back',9:'menu',12:'up',13:'down',14:'left',15:'right'},
     q:{0:'flip',1:'none',2:'none',3:'none',4:'undo',5:'none'},a:{0:'good',1:'again',2:'again',3:'good',4:'undo',5:'none'},
     flip:{0:'flip',1:'back',3:'star',12:'star',14:'prev',15:'next',4:'prev',5:'next'}};
   const cfg=()=>S.pad||{};
@@ -1698,20 +1698,43 @@ const PAD=(()=>{
       case 'next':key('ArrowRight');break;case 'prev':key('ArrowLeft');break;case 'star':key('s');break;
       case 'sizeup':size(1);break;case 'sizedn':size(-1);break;
       case 'menu':click('#akmenu,#opmenu,[data-menu],.dots');break;
-      case 'tabn':tab(1);break;case 'tabp':tab(-1);break}}
+      case 'tabn':tab(1);break;case 'tabp':tab(-1);break;
+      case 'click':mclick();break}}
+  // con trỏ chuột bằng cần phải, giống Contanki
+  let cur=null,cx=innerWidth/2,cy=innerHeight/2,cmoved=0,hov=null,lt=0;
+  const cursorOn=()=>cur&&Date.now()-cmoved<3500;
+  function cursorEl(){if(!cur){cur=document.createElement('div');cur.className='padcursor';cur.innerHTML='<svg viewBox="0 0 24 24" width="26" height="26"><path d="M4 2.5l15 9.2-6.6 1.4 3.9 7.3-3 1.6-3.9-7.4L4 19z" fill="#fff" stroke="#1d2b44" stroke-width="1.8" stroke-linejoin="round"/></svg>';document.body.appendChild(cur)}return cur}
+  function under(){const el=document.elementFromPoint(cx,cy);return el}
+  function clickable(el){return el&&el.closest('button,a[href],input,select,textarea,label,[data-tab],[data-sub],[data-fi],[data-study],[data-flipd],[data-sec],.dn,[tabindex],.fc,.frow,.opt,[onclick]')}
+  function hover(){const el=clickable(under());if(el!==hov){if(hov)hov.classList.remove('padhover');hov=el;if(el)el.classList.add('padhover')}}
+  function moveCursor(dx,dy){const c=cursorEl();cx=Math.max(2,Math.min(innerWidth-2,cx+dx));cy=Math.max(2,Math.min(innerHeight-2,cy+dy));
+    c.style.transform=`translate(${cx}px,${cy}px)`;c.classList.add('on');cmoved=Date.now();hover()}
+  function mclick(){if(!cur)return;const el=under();if(!el)return;const o={bubbles:true,cancelable:true,clientX:cx,clientY:cy,view:window,button:0};
+    cur.classList.add('tap');setTimeout(()=>cur&&cur.classList.remove('tap'),160);cmoved=Date.now();
+    try{el.dispatchEvent(new PointerEvent('pointerdown',Object.assign({pointerType:'mouse',isPrimary:true},o)))}catch(e){}el.dispatchEvent(new MouseEvent('mousedown',o));
+    try{el.dispatchEvent(new PointerEvent('pointerup',Object.assign({pointerType:'mouse',isPrimary:true},o)))}catch(e){}el.dispatchEvent(new MouseEvent('mouseup',o));
+    const t=el.closest('input,textarea,select');if(t){t.focus();if(t.tagName==='SELECT'&&t.showPicker)try{t.showPicker()}catch(e){}}
+    el.dispatchEvent(new MouseEvent('click',o));setTimeout(hover,60)}
+  setInterval(()=>{if(cur&&!cursorOn()){cur.classList.remove('on');if(hov){hov.classList.remove('padhover');hov=null}}},500);
   function press(b){if(cap){const c=cap;cap=null;c(b);return}if(!on())return;
+    if(b===0&&cursorOn()){mclick();return}
     const c=ctx();let a=c!=='all'?map(c)[b]:undefined;if(a===undefined||a==='inherit')a=map('all')[b];
     if(a&&a!=='none'){run(a);shown=Date.now();legend()}}
-  function scrollBy(dy){if(!on())return;const f=[...document.querySelectorAll('.fvstage .face')].find(e=>vis(e)&&e.scrollHeight>e.clientHeight+2);
+  function scrollAt(dy){// cuộn vùng nằm dưới con trỏ (hoặc giữa màn hình)
+    let el=document.elementFromPoint(cursorOn()?cx:innerWidth/2,cursorOn()?cy:innerHeight/2);
+    while(el&&el!==document.body){const cs=getComputedStyle(el);if(/(auto|scroll)/.test(cs.overflowY)&&el.scrollHeight>el.clientHeight+2){el.scrollTop+=dy;return true}el=el.parentElement}return false}
+  function scrollBy(dy){if(!on())return;if(scrollAt(dy))return;const f=[...document.querySelectorAll('.fvstage .face')].find(e=>vis(e)&&e.scrollHeight>e.clientHeight+2);
     const tgt=FV&&f&&f.scrollHeight>f.clientHeight?f:(document.querySelector('.sess')&&document.querySelector('.sess').scrollHeight>document.querySelector('.sess').clientHeight?document.querySelector('.sess'):null);
     if(tgt)tgt.scrollTop+=dy;else window.scrollBy(0,dy)}
-  function tick(t){raf=0;const g=pads()[0];if(!g){prev=[];return}
+  function tick(t){raf=0;const g=pads()[0];if(!g){prev=[];return}const dt=lt?Math.min(50,t-lt)/16.7:1;lt=t;
     if(g.id!==lastId){lastId=g.id;shown=Date.now();toast(L('Đã nhận tay cầm','Controller connected'));legend()}
     g.buttons.forEach((b,i)=>{const p=b.pressed||b.value>.5;
       if(p&&!prev[i]){held[i]=t;press(i)}
       else if(p&&prev[i]&&i>=12&&i<=15&&t-held[i]>380){held[i]=t-300;press(i)}
       prev[i]=p});
-    const dz=.18,ys=[g.axes[1]||0,g.axes[3]||0];ys.forEach(y=>{if(Math.abs(y)>dz)scrollBy(Math.sign(y)*(Math.abs(y)-dz)*28)});
+    const dz=.12,cv=v=>{const a=Math.abs(v);if(a<dz)return 0;const k=(a-dz)/(1-dz);return Math.sign(v)*(k*k*.75+k*.25)};
+    const y1=cv(g.axes[1]||0);if(y1)scrollBy(y1*30*dt);
+    const mx=cv(g.axes[2]||0),my=cv(g.axes[3]||0);if((mx||my)&&on())moveCursor(mx*20*dt,my*20*dt);
     const x=g.axes[0]||0,y0=g.axes[1]||0;// cần trái gạt ngang = như phím trái/phải
     const st=Math.abs(x)>.6?(x>0?15:14):0;if(st&&!ax[0]){ax[0]=1;press(st)}else if(!st)ax[0]=0;
     raf=requestAnimationFrame(tick)}
@@ -1720,10 +1743,10 @@ const PAD=(()=>{
   setInterval(start,1500);
   const chip=b=>`<span class="pbtn pb${b}">${BTN[b]||('#'+b)}</span>`;
   function legend(){const want=on()&&cfg().hint!==0&&pads().length&&(ctx()!=='all')&&Date.now()-shown<5000;
-    if(!want){if(hint){hint.remove();hint=null}return}
+    document.body.classList.toggle('padon',!!want);if(!want){if(hint){hint.remove();hint=null}return}
     if(!hint){hint=document.createElement('div');hint.className='padhint';document.body.appendChild(hint)}
     const c=ctx(),m=map(c),seen=new Set(),rows=Object.entries(m).filter(([b,a])=>a&&a!=='none'&&a!=='inherit'&&!seen.has(a)&&seen.add(a)).slice(0,5);
-    hint.classList.toggle('hi',c==='q'||c==='a');hint.innerHTML=rows.map(([b,a])=>`<span>${chip(+b)}${esc(ACT[a]?ACT[a][0]:a)}</span>`).join('')}
+    hint.innerHTML=rows.map(([b,a])=>`<span>${chip(+b)}${esc(ACT[a]?ACT[a][0]:a)}</span>`).join('')}
   setInterval(legend,800);
   function settingsHTML(){const g=pads()[0];
     return `<div class="card"><div class="ot">${L('Tay cầm chơi game','Game controller')}</div>
@@ -1731,7 +1754,7 @@ const PAD=(()=>{
     <div class="seg" style="margin-top:10px">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-pon="${k}" class="${(on()?1:0)===k?'on':''}">${l}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:12px">${L('Bảng nút gợi ý khi học','Button hints while studying')}</div><div class="seg" style="margin-top:6px">${[[1,L('Hiện','Show')],[0,L('Ẩn','Hide')]].map(([k,l])=>`<button data-phi="${k}" class="${(cfg().hint===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
     <button class="btn line" id="pmap" style="margin-top:12px">${L('Gán nút','Button mapping')}</button>
-    <div class="tiny" style="margin-top:8px">${L('Mặc định giống Contanki: A lật thẻ / Nhớ, B Quên, LB hoàn tác, mũi tên chọn mục, cần gạt để cuộn, View để thoát.','Defaults follow Contanki: A flip / remembered, B forgot, LB undo, D-pad to move, sticks scroll, View exits.')}</div></div>`}
+    <div class="tiny" style="margin-top:8px">${L('Mặc định giống Contanki: A lật thẻ / Nhớ, B Quên, LB hoàn tác. Cần phải là con trỏ chuột, bấm A hoặc nhấn cần phải để click. Cần trái để cuộn, mũi tên chọn mục, View để thoát.','Defaults follow Contanki: A flip / remembered, B forgot, LB undo. Right stick moves a mouse cursor, A or R3 clicks. Left stick scrolls, D-pad moves, View exits.')}</div></div>`}
   function bindSettings(redraw){
     document.querySelectorAll('[data-pon]').forEach(b=>b.onclick=()=>{S.pad=Object.assign({},cfg(),{on:+b.dataset.pon});save();legend();redraw()});
     document.querySelectorAll('[data-phi]').forEach(b=>b.onclick=()=>{S.pad=Object.assign({},cfg(),{hint:+b.dataset.phi});save();legend();redraw()});

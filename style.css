@@ -981,4 +981,9 @@ body.studying .cloud{animation-duration:var(--dur)}
 .pmrows{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-height:52vh;overflow:auto}
 .pmrow{display:flex;align-items:center;gap:10px}.pmrow .pbtn{min-width:40px;height:30px;border-radius:15px;font-size:13px}.pmrow select{flex:1;min-width:0}
 .wrapseg{flex-wrap:wrap}
-.padhint.hi{bottom:calc(96px + env(safe-area-inset-bottom))}
+/* v65: bảng nút là dải riêng dưới cùng, nội dung được đẩy lên */
+.padhint{left:0;right:0;transform:none;width:auto;max-width:none;bottom:0;border-radius:18px 18px 0 0;padding:8px 14px calc(8px + env(safe-area-inset-bottom));min-height:40px;align-items:center;flex-wrap:nowrap;overflow:hidden;opacity:1}
+body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bottom .25s}
+.padcursor{position:fixed;left:-3px;top:-2px;z-index:9999;pointer-events:none;opacity:0;transition:opacity .25s;filter:drop-shadow(0 2px 4px rgba(0,0,0,.35))}
+.padcursor.on{opacity:1}.padcursor svg{transition:transform .12s}.padcursor.tap svg{transform:scale(.8)}
+.padhover{box-shadow:0 0 0 3px rgba(240,180,40,.55)!important;border-radius:12px}

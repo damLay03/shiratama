@@ -1717,7 +1717,7 @@ const PAD=(()=>{
     el.dispatchEvent(new MouseEvent('click',o));setTimeout(hover,60)}
   setInterval(()=>{if(cur&&!cursorOn()){cur.classList.remove('on');if(hov){hov.classList.remove('padhover');hov=null}}},500);
   function press(b){if(cap){const c=cap;cap=null;c(b);return}if(!on())return;
-    if(b===0&&cursorOn()){mclick();return}
+    if(b===0&&cursorOn()&&ctx()==='all'){mclick();return}
     const c=ctx();let a=c!=='all'?map(c)[b]:undefined;if(a===undefined||a==='inherit')a=map('all')[b];
     if(a&&a!=='none'){run(a);shown=Date.now();legend()}}
   function scrollAt(dy){// cuộn vùng nằm dưới con trỏ (hoặc giữa màn hình)
@@ -1734,7 +1734,7 @@ const PAD=(()=>{
       prev[i]=p});
     const dz=.12,cv=v=>{const a=Math.abs(v);if(a<dz)return 0;const k=(a-dz)/(1-dz);return Math.sign(v)*(k*k*.75+k*.25)};
     const y1=cv(g.axes[1]||0);if(y1)scrollBy(y1*30*dt);
-    const mx=cv(g.axes[2]||0),my=cv(g.axes[3]||0);if((mx||my)&&on())moveCursor(mx*20*dt,my*20*dt);
+    const cz=v=>Math.hypot(g.axes[2]||0,g.axes[3]||0)<.28?0:cv(v);const mx=cz(g.axes[2]||0),my=cz(g.axes[3]||0);if((mx||my)&&on())moveCursor(mx*20*dt,my*20*dt);
     const x=g.axes[0]||0,y0=g.axes[1]||0;// cần trái gạt ngang = như phím trái/phải
     const st=Math.abs(x)>.6?(x>0?15:14):0;if(st&&!ax[0]){ax[0]=1;press(st)}else if(!st)ax[0]=0;
     raf=requestAnimationFrame(tick)}

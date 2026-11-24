@@ -990,3 +990,11 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .prog span.akleft{left:0;right:auto;font-size:13px;color:var(--ink2);white-space:nowrap}
 .prog .akleft b{font-size:14px;margin-left:10px;margin-right:2px}.prog .akleft b:first-child{margin-left:0}
 .prog .akleft .cn{color:var(--s1)}.prog .akleft .cl{color:var(--s2)}.prog .akleft .cr{color:var(--s3)}
+/* v68: giãn nợ */
+.gnbtn{width:100%;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+.gnbars{display:flex;align-items:flex-end;gap:6px;margin:16px 0 6px;padding:10px 4px 0;overflow-x:auto}
+.gnb{flex:1;min-width:30px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.gnb i{display:block;width:100%;max-width:26px;border-radius:8px 8px 3px 3px;background:var(--s3);opacity:.75;transition:height .3s}
+.gnb.today i{background:var(--bee-deep);opacity:1}
+.gnb b{font-size:11px;color:var(--ink2)}.gnb span{font-size:10.5px;color:var(--ink3);white-space:nowrap}
+.gninfo{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--line);font-size:14px;line-height:1.45}

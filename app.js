@@ -751,6 +751,47 @@ function ankiQueue(cards,deckSet,decks,topName){
   return {due:learn.concat(R),learn,rev:R,fresh:N,mix:TP.mix};
 }
 
+/* ---------- giãn nợ: lùi lịch thẻ ôn còn nhớ chắc, rải đều ra vài ngày (giống Postpone của FSRS Helper) ---------- */
+function backlog(st){const now=Date.now(),de=dayEnd(),ds=de-864e5,fl=flipIds(st.decks||[]);
+  const due=st.cards.filter(c=>!c.susp&&!fl.has(c.deck)&&c.card.state===2&&new Date(c.card.due).getTime()<=de);
+  return {due,over:due.filter(c=>new Date(c.card.due).getTime()<ds).length,now,de,fl}}
+function gianoDialog(st,done){
+  const B=backlog(st);const tot=B.due.length;const snap=ls.get('shiratama-giano',null);
+  const byR=B.due.slice().sort((a,b)=>retr(a,B.now)-retr(b,B.now)); // sắp quên nhất trước
+  const future=[];for(let k=1;k<=14;k++){const a=B.de+(k-1)*864e5,b=a+864e5;future.push(st.cards.filter(c=>!c.susp&&!B.fl.has(c.deck)&&c.card.state===2&&(t=>t>a&&t<=b)(new Date(c.card.due).getTime())).length)}
+  let keep=Math.min(tot,Math.max(30,Math.round((S.gianoKeep||150)))),days=S.gianoDays||7;
+  const v=document.createElement('div');v.className='veil';document.body.appendChild(v);
+  function plan(){const moved=byR.slice(keep).reverse();// thẻ nhớ chắc nhất đi xa nhất
+    const load=future.slice(0,days);const target=(load.reduce((a,b)=>a+b,0)+moved.length)/days;const asg=[];let d=days-1;
+    moved.forEach(c=>{while(d>0&&load[d]>=target)d--;load[d]++;asg.push([c,d+1])});
+    let rs=0;asg.forEach(([c,k])=>{rs+=retr(c,B.de+(k-1)*864e5+36e5)});
+    return {asg,load,avg:asg.length?rs/asg.length:1}}
+  function draw(){const P=plan();const mx=Math.max(keep,...P.load,1);
+    v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px">${L('Giãn nợ thẻ ôn','Spread out overdue reviews')}</div><button class="iconbtn" id="gnx">${I.x}</button></div>
+    <p class="small muted" style="margin:0 0 14px">${tot?L(`Đang có <b>${tot}</b> thẻ ôn đến hạn, trong đó <b>${B.over}</b> thẻ quá hạn từ hôm trước.`,`<b>${tot}</b> reviews due, <b>${B.over}</b> overdue from earlier days.`):L('Không có thẻ ôn nào đến hạn.','No reviews due.')}</p>
+    ${tot?`<div class="ot">${L('Giữ lại hôm nay','Keep for today')}</div>
+    <div class="row"><input type="range" id="gnk" class="grow" min="0" max="${tot}" value="${keep}" style="accent-color:var(--bee-deep)"><b style="min-width:52px;text-align:right;font-size:18px">${keep}</b></div>
+    <div class="tiny" style="margin:4px 0 14px">${L('Giữ lại những thẻ sắp quên nhất. Thẻ còn lại được lùi lịch.','The cards you are most likely to forget stay. The rest are postponed.')}</div>
+    <div class="ot">${L('Rải số thẻ lùi ra trong','Spread postponed cards over')}</div>
+    <div class="seg">${[3,5,7,10,14].map(n=>`<button data-gd="${n}" class="${n===days?'on':''}">${n} ${L('ngày','days')}</button>`).join('')}</div>
+    <div class="gnbars">${[[L('Nay','Today'),keep,1]].concat(P.load.map((n,i)=>[new Date(B.de+i*864e5+36e5).toLocaleDateString(L('vi-VN','en-GB'),{day:'numeric',month:'numeric'}),n,0])).map(([l,n,t])=>`<div class="gnb ${t?'today':''}"><b>${n}</b><i style="height:${Math.max(3,Math.round(n/mx*90))}px"></i><span>${l}</span></div>`).join('')}</div>
+    <div class="gninfo">${P.asg.length?L(`Lùi <b>${P.asg.length}</b> thẻ. Lúc tới lượt, trung bình anh vẫn nhớ khoảng <b>${Math.round(P.avg*100)}%</b>.`,`Postpones <b>${P.asg.length}</b> cards. When they come back you should still remember about <b>${Math.round(P.avg*100)}%</b> on average.`):L('Không lùi thẻ nào.','Nothing to postpone.')}</div>
+    <button class="btn bee" id="gngo" style="width:100%;margin-top:14px" ${P.asg.length?'':'disabled'}>${L(`Giãn ${P.asg.length} thẻ`,`Postpone ${P.asg.length} cards`)}</button>`:''}
+    ${snap?`<button class="btn line" id="gnun" style="width:100%;margin-top:10px">${L(`Hoàn tác lần giãn trước (${Object.keys(snap.ids).length} thẻ)`,`Undo last postpone (${Object.keys(snap.ids).length} cards)`)}</button>`:''}
+    <div class="tiny" style="margin-top:12px">${L('Không xóa thẻ, không đổi độ nhớ. Thẻ lùi mà sau đó vẫn nhớ thì lần sau còn giãn xa hơn. Muốn ôn ít nợ lâu dài thì giảm số thẻ mới mỗi ngày.','Nothing is deleted. Postponed cards you still remember get even longer intervals. To keep reviews low long-term, lower new cards per day.')}</div></div>`;
+    v.querySelector('#gnx').onclick=()=>v.remove();
+    const k=v.querySelector('#gnk');if(k)k.oninput=()=>{keep=+k.value;S.gianoKeep=keep;save();draw();const k2=v.querySelector('#gnk');if(k2)k2.focus()};
+    v.querySelectorAll('[data-gd]').forEach(b=>b.onclick=()=>{days=+b.dataset.gd;S.gianoDays=days;save();draw()});
+    const go=v.querySelector('#gngo');if(go)go.onclick=async()=>{go.disabled=true;const ids={};const rows=P.asg.map(([c,k])=>{const old=c.card.due;ids[c.id]=typeof old==='string'?old:new Date(old).toISOString();
+        const t=B.de+(k-1)*864e5+6e4;c.card=Object.assign({},c.card,{due:typeof old==='string'?new Date(t).toISOString():new Date(t)});return c});
+      try{await ANKI.putMany('cards',rows);ls.set('shiratama-giano',{at:Date.now(),ids});dropState();v.remove();toast(L(`Đã giãn ${rows.length} thẻ`,`Postponed ${rows.length} cards`));SFX.play('ok');done&&done()}
+      catch(e){toast(L('Không lưu được','Could not save'));go.disabled=false}};
+    const un=v.querySelector('#gnun');if(un)un.onclick=async()=>{const all=(await ankiState(true)).cards;const rows=[];
+      all.forEach(c=>{const o=snap.ids[c.id];if(o&&(!c.appAt||c.appAt<=snap.at)){c.card=Object.assign({},c.card,{due:typeof c.card.due==='string'?o:new Date(o)});rows.push(c)}});
+      try{if(rows.length)await ANKI.putMany('cards',rows);ls.set('shiratama-giano',null);dropState();v.remove();toast(L(`Đã trả ${rows.length} thẻ về lịch cũ`,`Restored ${rows.length} cards`));done&&done()}catch(e){toast(L('Không lưu được','Could not save'))}};
+  }
+  draw()}
+
 let SORTING=false;
 function home(){
   shell(`${header()}<div id="ankiBox" class="homegrid"><div class="card tiny">${L('Đang đọc thẻ…','Loading cards…')}</div></div>`);
@@ -778,6 +819,7 @@ async function ankiBox(){
      <div class="hero-n">${nAll}<span> ${L('thẻ','cards')}</span></div>
      <div class="hero-split"><span><i class="dot nw"></i>${L('Mới','New')} <b>${tot.fresh.length}</b></span><span><i class="dot ln"></i>${L('Đang học','Learning')} <b>${tot.learn.length}</b></span><span><i class="dot rv"></i>${L('Ôn','Review')} <b>${tot.rev.length}</b></span></div>
      <button class="btn bee big" id="ankiAll" ${nAll?'':'disabled'}>${nAll?L('Học ngay','Study now'):L('Xong hết rồi','All done')}</button>
+     ${(()=>{const B=backlog(st);return B.due.length>tot.rev.length||B.over>=20?`<button class="btn line gnbtn" id="gnopen">${I.clock||''}${L(`Giãn nợ · ${B.due.length} thẻ ôn đến hạn`,`Spread out · ${B.due.length} reviews due`)}</button>`:''})()}
      <div class="tiny center" style="margin-top:10px">${L(`Đã học ${D.n} thẻ · ${Math.round(D.ms/60000)} phút hôm nay`,`${D.n} cards · ${Math.round(D.ms/60000)} min today`)}</div>
    </div>
    <div class="tools">
@@ -792,6 +834,7 @@ async function ankiBox(){
    <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}
    </div>`;
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
+  const gn=$('#gnopen');if(gn)gn.onclick=()=>gianoDialog(st,ankiBox);
   const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
   $$('[data-tw]').forEach(b=>b.onclick=()=>{S.collapsed=S.collapsed||{};S.collapsed[b.dataset.tw]=!S.collapsed[b.dataset.tw];save();ankiBox()});

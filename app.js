@@ -236,9 +236,10 @@ function sys(){
     <div class="kv"><span>${esc(examName())}</span><b>${examDay()?examDay().toLocaleDateString(L('vi-VN','en-GB')):L('chưa đặt','not set')}</b></div>
     <button class="btn line" id="sexd" style="margin-top:10px">${L('Đổi ngày thi','Change exam date')}</button></div>
    <div class="card"><div class="ot">${L('Cỡ chữ trên thẻ và câu hỏi','Text size on cards and questions')}</div>
-    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><div class="grow center jp szprev" style="font-size:${SIZES[S.size]}px">日本語の勉強</div><b class="tiny" style="min-width:38px;text-align:center">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
+    <div class="row"><button class="btn line" id="sm" ${S.size?'':'disabled'}>A−</button><b class="tiny grow center" style="font-size:15px">${SIZES[S.size]}px</b><button class="btn line" id="sp" ${S.size<SIZES.length-1?'':'disabled'}>A+</button></div>
+    <div class="jp szprev" style="font-size:${SIZES[S.size]}px">日本語の勉強</div>
     <input type="range" id="srng" min="0" max="${SIZES.length-1}" value="${S.size}" style="width:100%;margin-top:12px;accent-color:var(--bee-deep)">
-    <div class="tiny" style="margin-top:8px">${L(`${SIZES.length} nấc, từ ${SIZES[0]}px đến ${SIZES[SIZES.length-1]}px. Khi đang học, bấm nút Aa ở góc trên để đổi nhanh.`,`${SIZES.length} steps. While studying, tap Aa at the top to change it.`)}</div></div>
+    <div class="tiny" style="margin-top:8px">${L(`${SIZES.length} nấc, từ ${SIZES[0]}px đến ${SIZES[SIZES.length-1]}px. Khi đang học, bấm nút hai chữ T ở góc trên để đổi nhanh.`,`${SIZES.length} steps. While studying, tap the Tt button at the top to change it.`)}</div></div>
    <div class="card"><div class="ot">${L('Ngày mới bắt đầu lúc','New day starts at')}</div>
     <div class="row"><button class="btn line" id="dhm">−</button><b class="grow center" id="dhv" style="font-size:22px">${dayHour()}:00</b><button class="btn line" id="dhp">+</button></div>
     <div class="tiny" style="margin-top:8px">${L('Đến giờ này app mới tính sang ngày mới: mở thẻ mới và đếm lại số thẻ ôn trong ngày. Hay thức khuya thì để muộn hơn.','At this hour the app rolls over to a new day: new cards open and daily counts reset. Night owls can set it later.')}</div></div>
@@ -279,7 +280,7 @@ function modeOf(name,decks){const by={};decks.forEach(d=>by[d.name]=d);const p=n
 function flipIds(decks){const s=new Set();decks.forEach(d=>{if(modeOf(d.name,decks)==='flip')s.add(d.id)});return s}
 
 /* ---- nút cỡ chữ (mọi màn học thẻ) ---- */
-function sizeBtnHTML(){return `<div class="szw"><button class="iconbtn szb" id="szb" aria-label="${L('Cỡ chữ','Text size')}" title="${L('Cỡ chữ','Text size')}"><span>A</span><span>a</span></button>
+function sizeBtnHTML(){return `<div class="szw"><button class="iconbtn szb" id="szb" aria-label="${L('Cỡ chữ','Text size')}" title="${L('Cỡ chữ','Text size')}"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5.5h11M8.5 5.5v13M13.5 11.5h7.5M17.25 11.5v7"/></svg></button>
   <div class="szpop" id="szpop"><button data-sz="-1" aria-label="A−">A−</button><b id="szv">${SIZES[S.size]}px</b><button data-sz="1" aria-label="A+">A+</button></div></div>`}
 function bindSizeBtn(after){const b=$('#szb'),p=$('#szpop');if(!b)return;
   b.onclick=e=>{e.stopPropagation();p.classList.toggle('open')};p.addEventListener('pointerdown',e=>e.stopPropagation());

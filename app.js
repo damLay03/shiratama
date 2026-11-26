@@ -759,8 +759,13 @@ function backlog(st){const now=Date.now(),de=dayEnd(),ds=de-864e5,fl=flipIds(st.
   const due=st.cards.filter(c=>!c.susp&&!fl.has(c.deck)&&c.card.state===2&&new Date(c.card.due).getTime()<=de);
   return {due,over:due.filter(c=>new Date(c.card.due).getTime()<ds).length,now,de,fl}}
 // thẻ đã giãn mà chưa ôn, vẫn còn nằm ở các ngày sau
-function postponed(st,de){const snap=ls.get('shiratama-giano',null);if(!snap||!snap.ids)return [];
-  return st.cards.filter(c=>snap.ids[c.id]&&!(c.appAt>snap.at)&&!c.susp&&c.card.state===2&&new Date(c.card.due).getTime()>de)}
+// dấu giãn nằm trong c.card.pp nên đồng bộ sang máy khác; ôn xong thì FSRS tạo card mới, dấu tự mất
+function postponed(st,de){const snap=ls.get('shiratama-giano',null)||{};const ids=snap.ids||{};
+  return st.cards.filter(c=>!c.susp&&c.card.state===2&&new Date(c.card.due).getTime()>de&&((c.card.pp&&!(c.appAt>c.card.pp))||(ids[c.id]&&!(c.appAt>snap.at))))}
+// máy đã giãn bằng bản cũ: ghi dấu giãn vào thẻ để máy khác cũng thấy
+async function gianoMigrate(st){const snap=ls.get('shiratama-giano',null);if(!snap||!snap.ids||ls.get('shiratama-giano-mig',0)===snap.at)return;
+  const rows=st.cards.filter(c=>snap.ids[c.id]&&!(c.appAt>snap.at)&&!c.card.pp).map(c=>{c.card=Object.assign({},c.card,{pp:snap.at});return c});
+  try{if(rows.length)await ANKI.putMany('cards',rows);ls.set('shiratama-giano-mig',snap.at)}catch(e){}}
 // trả hết nợ một lần: mọi thẻ ôn đến hạn (bỏ qua giới hạn mỗi ngày) + thẻ đã giãn, thẻ sắp quên nhất trước
 function debtCards(st){const B=backlog(st);const ds=B.de-864e5;const seen=new Set();
   return B.due.filter(c=>new Date(c.card.due).getTime()<ds).concat(postponed(st,B.de)).filter(c=>!seen.has(c.id)&&seen.add(c.id))}
@@ -781,7 +786,7 @@ function gianoDialog(st,done){
     return {asg,load,avg:asg.length?rs/asg.length:1}}
   function draw(){const P=plan();const mx=Math.max(keep,...P.load,1);
     v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px">${L('Kho nợ thẻ ôn','Review debt box')}</div><button class="iconbtn" id="gnx">${I.x}</button></div>
-    ${(()=>{const n=debtCards(st).length;return n?`<div class="debtbig"><b>${n}</b><span>${L('thẻ nợ trong kho','cards in your debt box')}</span></div><div class="ot">${L('Trả một lượt','Pay a round')}</div>
+    ${(()=>{const n=debtCards(st).length;return n?`<div class="debtbig"><b>${n}</b><span>${L('thẻ nợ trong kho','cards in your debt box')}</span></div>${(()=>{const pp=postponed(st,B.de).length;return pp?`<div class="tiny" style="margin:-8px 0 14px">${L(`Trong đó ${pp} thẻ đã giãn, đang chờ tới ngày của nó. Muốn ôn sớm thì trả luôn ở đây.`,`${pp} of them were postponed and are waiting for their day.`)}</div>`:''})()}<div class="ot">${L('Trả một lượt','Pay a round')}</div>
     <div class="seg">${[20,50,100,0].filter(k=>!k||k<n).map(k=>`<button data-gpay="${k}">${k?k+L(' thẻ',''):L('Hết','All')}</button>`).join('')}</div>
     <div class="ot" style="margin-top:16px">${L('Mỗi ngày tự đưa vào phần ôn','Added to daily reviews')}</div>
     <div class="seg">${[[0,'0'],[20,'20'],[50,'50'],[100,'100'],[99999,L('Tất cả','All')]].map(([k,l])=>`<button data-gdrip="${k}" class="${(S.debtDrip===undefined?50:S.debtDrip)===k?'on':''}">${l}</button>`).join('')}</div>
@@ -804,11 +809,11 @@ function gianoDialog(st,done){
     const k=v.querySelector('#gnk');if(k)k.oninput=()=>{keep=+k.value;S.gianoKeep=keep;save();draw();const k2=v.querySelector('#gnk');if(k2)k2.focus()};
     v.querySelectorAll('[data-gd]').forEach(b=>b.onclick=()=>{days=+b.dataset.gd;S.gianoDays=days;save();draw()});
     const go=v.querySelector('#gngo');if(go)go.onclick=async()=>{go.disabled=true;const ids={};const rows=P.asg.map(([c,k])=>{const old=c.card.due;ids[c.id]=typeof old==='string'?old:new Date(old).toISOString();
-        const t=B.de+(k-1)*864e5+6e4;c.card=Object.assign({},c.card,{due:typeof old==='string'?new Date(t).toISOString():new Date(t)});return c});
+        const t=B.de+(k-1)*864e5+6e4;c.card=Object.assign({},c.card,{due:typeof old==='string'?new Date(t).toISOString():new Date(t),pp:Date.now()});return c});
       try{await ANKI.putMany('cards',rows);ls.set('shiratama-giano',{at:Date.now(),ids});dropState();v.remove();toast(L(`Đã giãn ${rows.length} thẻ`,`Postponed ${rows.length} cards`));SFX.play('ok');done&&done()}
       catch(e){toast(L('Không lưu được','Could not save'));go.disabled=false}};
     const un=v.querySelector('#gnun');if(un)un.onclick=async()=>{const all=(await ankiState(true)).cards;const rows=[];
-      all.forEach(c=>{const o=snap.ids[c.id];if(o&&(!c.appAt||c.appAt<=snap.at)){c.card=Object.assign({},c.card,{due:typeof c.card.due==='string'?o:new Date(o)});rows.push(c)}});
+      all.forEach(c=>{const o=snap.ids[c.id];if(o&&(!c.appAt||c.appAt<=snap.at)){c.card=Object.assign({},c.card,{due:typeof c.card.due==='string'?o:new Date(o)});delete c.card.pp;rows.push(c)}});
       try{if(rows.length)await ANKI.putMany('cards',rows);ls.set('shiratama-giano',null);dropState();v.remove();toast(L(`Đã trả ${rows.length} thẻ về lịch cũ`,`Restored ${rows.length} cards`));done&&done()}catch(e){toast(L('Không lưu được','Could not save'))}};
   }
   draw()}
@@ -855,6 +860,7 @@ async function ankiBox(){
    <div class="decks">${tree.roots.map(r=>row(r,0)).join('')}</div>`:`<p class="muted small" style="margin:0">${L('Chưa có thẻ nào.','No cards yet.')}</p>`}
    </div>`;
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
+  gianoMigrate(st);
   const gn=$('#gnopen');if(gn)gn.onclick=()=>gianoDialog(st,ankiBox);
   const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
@@ -1201,7 +1207,7 @@ function fsFor(P){const k=P.ret+'|'+P.maxIvl+'|'+P.w;
 function schedule(card,g,P){
   const now=new Date();const prev=card.state;const step=card.lstep||0;
   const nx=fsFor(P).repeat(reviveA(card),now)[g].card;
-  const out=Object.assign({},nx);const min=m=>new Date(now.getTime()+m*60000);
+  const out=Object.assign({},nx);delete out.pp;const min=m=>new Date(now.getTime()+m*60000);
   const day=(d)=>{out.state=2;out.scheduled_days=d;out.due=new Date(now.getTime()+d*864e5);out.lstep=0};
   if(prev===0||prev===1){const S_=P.learn;
     if(g===1){if(S_.length){out.state=1;out.lstep=0;out.due=min(S_[0]);out.scheduled_days=0}else day(Math.max(1,nx.scheduled_days))}

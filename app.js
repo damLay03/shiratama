@@ -278,6 +278,12 @@ let FV=null;
 // deck nào đang ở chế độ tự lướt (deck con theo deck cha gần nhất có đặt chế độ)
 function modeOf(name,decks){const by={};decks.forEach(d=>by[d.name]=d);const p=name.split('::');
   for(let i=p.length;i>0;i--){const d=by[p.slice(0,i).join('::')];if(d&&d.mode)return d.mode}return 'srs'}
+// màu deck: lấy màu của deck, không có thì của deck cha gần nhất
+function colorOfName(name,decks){const by={};decks.forEach(d=>by[d.name]=d);const p=name.split('::');
+  for(let i=p.length;i>0;i--){const d=by[p.slice(0,i).join('::')];if(d&&d.color)return d.color}return ''}
+function deckColor(id,decks){if(!decks)return '';const d=decks.find(x=>x.id===id);return d?colorOfName(d.name,decks):''}
+const okColor=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'';
+const DCOLORS=['#2f6fb3','#3a9e8f','#5c9a06','#ee8a12','#df2a86','#8a5cd0','#e2574c','#c99a06','#4a8fd8','#6b7a8f'];
 function flipIds(decks){const s=new Set();decks.forEach(d=>{if(modeOf(d.name,decks)==='flip')s.add(d.id)});return s}
 
 /* ---- nút cỡ chữ (mọi màn học thẻ) ---- */
@@ -395,7 +401,7 @@ function startFlipDeck(st,set,name){
   const rank={};secs.forEach((x,k)=>rank[x.id]=k);
   const all=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>(rank[a.deck]-rank[b.deck])||createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
   if(!all.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
-  S.flipPos=S.flipPos||{};FV={key:'d:'+name,title:name.split('::').pop(),secs,col:new Set(ls.get('shiratama-fcol:'+name,null)||(secs.filter(x=>all.some(c=>c.deck===x.id)).length>1?secs.map(x=>x.id):[])),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
+  S.flipPos=S.flipPos||{};FV={decks:st.decks,key:'d:'+name,title:name.split('::').pop(),secs,col:new Set(ls.get('shiratama-fcol:'+name,null)||(secs.filter(x=>all.some(c=>c.deck===x.id)).length>1?secs.map(x=>x.id):[])),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
   flipItems();render()}
 function flipItems(){const F=FV;let it=F.all;if(F.only)it=it.filter(isStar);if(F.shuf)it=F.shufOrder?F.shufOrder.filter(c=>it.includes(c)):it;F.items=it;
   if(F.i>=it.length)F.i=Math.max(0,it.length-1)}
@@ -431,7 +437,7 @@ function renderFlipList(){
       <div class="meter flh-m"><i style="width:${F.all.length?(pos+1)/F.all.length*100:0}%"></i></div>
 </div>
     ${N?groups.map((g,gi)=>{const open=!multi||!F.col.has(g.id);const ns=g.cards.filter(isStar).length;
-      return `<section class="fsec c${gi%6+1}">${multi?`<button class="fsh" data-sec="${esc(g.id)}"><span class="car">${open?'▾':'▸'}</span><b>${esc(g.name)}</b><span class="tiny">${g.cards.length} ${L('thẻ','cards')}${ns?` · ★ ${ns}`:''}</span></button>`:''}
+      const gcol=okColor(deckColor(g.id,F.decks));return `<section class="fsec c${gi%6+1}" ${gcol?`style="--acc:${gcol}"`:''}>${multi?`<button class="fsh" data-sec="${esc(g.id)}"><span class="car">${open?'▾':'▸'}</span><b>${esc(g.name)}</b><span class="tiny">${g.cards.length} ${L('thẻ','cards')}${ns?` · ★ ${ns}`:''}</span></button>`:''}
        ${open?`<div class="frows">${g.cards.map(row).join('')}</div>`:''}</section>`}).join('')
       :`<div class="card center tiny">${L('Chưa có thẻ ★ nào.','No starred cards.')}</div>`}
    </div>`);
@@ -452,7 +458,7 @@ function renderFlipCard(){
   full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}${sec?` · ${esc(sec)}`:''}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
    ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
-   <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''}" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
+   <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''} ${okColor(deckColor(it.deck,F.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,F.decks))||'transparent'}"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
      <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg><span class="fmore" id="fmore"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></div>
 </div>`);
   ANKI.hydrate($('#fc'));
@@ -892,6 +898,7 @@ async function deckOptions(name){
   const opt=(id,val,list)=>`<select class="field" id="${id}">${list.map(([k,l])=>`<option value="${k}" ${String(val)===String(k)?'selected':''}>${l}</option>`).join('')}</select>`;
   const sw=(id,on,label,help)=>`<label class="chk"><input type="checkbox" id="${id}" ${on?'checked':''}> <span>${label}${help?`<span class="tiny" style="display:block">${help}</span>`:''}</span></label>`;
   const used=pid=>st.decks.filter(x=>String(x.cfgId||'1')===pid).length;
+  let pickCol=okColor(d.color);
   const draw=()=>{const c=Object.assign({},PDEF,P[pid]);
     v.innerHTML=`<div class="panel wide opts-panel">
    <div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px;overflow:hidden;text-overflow:ellipsis">${L('Cài đặt deck','Deck options')}: ${esc(name)}</div><button class="iconbtn" id="ox">${I.x}</button></div>
@@ -944,6 +951,8 @@ async function deckOptions(name){
    <div class="osec"><div class="ot">${L('Deck này','This deck')}</div>
      <label class="lab">${L('Tên deck','Deck name')}<input class="field" id="oname" value="${esc(name.split('::').pop())}"></label>
      <label class="lab">${L('Nằm trong deck','Inside deck')}${parentSelect('opar',st,name.includes('::')?name.slice(0,name.lastIndexOf('::')):'',name)}</label>
+     <div class="lab">${L('Màu của deck','Deck colour')}<span class="tiny" style="display:block">${L('Tô màu thẻ và mục của deck này, deck con không chọn màu thì theo màu deck cha.','Colours this deck\'s cards and section; subdecks without a colour follow the parent.')}</span>
+       <div class="dcpick">${['',...DCOLORS].map(k=>`<button class="dcs ${(pickCol||'')===k?'on':''}" data-dc="${k}" style="--c:${k||'transparent'}" aria-label="${k||L('Mặc định','Default')}">${k?'':L('Mặc định','Auto')}</button>`).join('')}<label class="dcs dcx ${pickCol&&!DCOLORS.includes(pickCol)?'on':''}" style="--c:${pickCol&&!DCOLORS.includes(pickCol)?pickCol:'transparent'}">${L('Khác','Other')}<input type="color" id="odcx" value="${pickCol||'#7a5cd0'}"></label></div></div>
      <label class="lab">${L('Cách học deck này','How to study this deck')}${opt('omode',modeOf(name,st.decks),[['srs',L('Học đề xuất (app tính lịch ôn)','Scheduled (spaced repetition)')],['flip',L('Tự lướt thẻ (không tính lịch)','Flip through (no scheduling)')]])}</label>
      ${H(L('Tự lướt: mở ra là lướt hết thẻ theo thứ tự, không chấm Nhớ/Quên, không tính vào số thẻ cần học hôm nay. Lịch ôn cũ của thẻ vẫn giữ nguyên, đổi lại học đề xuất là tiếp tục như trước.','Flip: browse all cards in order without grading. Existing schedules are kept.'))}
      ${H(L('Chọn deck cha để gom deck này vào trong deck đó (như kéo thả trong Anki). Deck con của nó đi theo.','Pick a parent to nest this deck; its subdecks move along.'))}
@@ -953,6 +962,9 @@ async function deckOptions(name){
   </div>`;
     const q=s=>v.querySelector(s);
     q('#ox').onclick=close;
+    const dcOn=el=>{v.querySelectorAll('.dcs').forEach(b=>b.classList.toggle('on',b===el))};
+    v.querySelectorAll('[data-dc]').forEach(b=>b.onclick=e=>{e.preventDefault();pickCol=b.dataset.dc;dcOn(b)});
+    const dx=q('#odcx');if(dx)dx.oninput=()=>{pickCol=okColor(dx.value);const l=dx.closest('.dcx');l.style.setProperty('--c',pickCol);dcOn(l)};
     q('#oret').oninput=e=>q('#oretv').textContent=e.target.value+'%';
     q('#opre').onchange=e=>{collect();pid=e.target.value;draw()};
     q('#opmenu').onclick=()=>{const a=q('#opacts');a.style.display=a.style.display==='none'?'flex':'none'};
@@ -970,7 +982,7 @@ async function deckOptions(name){
       const sh=q('#oname').value.trim().replace(/::+/g,' ')||name.split('::').pop();const par=q('#opar').value;const nn=(par?par+'::':'')+sh;
       if(nn!==name&&st.decks.some(x=>x.name===nn)){toast(L('Đã có deck tên này ở chỗ đó','A deck with that name is already there'));return}
       const targets=q('#osub').checked?st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::')):[d];
-      targets.forEach(x=>x.cfgId=pid);const md=q('#omode').value;if(modeOf(name,st.decks)!==md||d.mode)d.mode=md;if(!targets.includes(d))targets.push(d);await ANKI.putMany('decks',targets);
+      targets.forEach(x=>x.cfgId=pid);if((d.color||'')!==(pickCol||'')){d.color=pickCol||'';if(!targets.includes(d))targets.push(d)}const md=q('#omode').value;if(modeOf(name,st.decks)!==md||d.mode)d.mode=md;if(!targets.includes(d))targets.push(d);await ANKI.putMany('decks',targets);
       if(nn&&nn!==name){const rows=st.decks.filter(x=>x.name===name||x.name.startsWith(name+'::'));rows.forEach(x=>x.name=nn+x.name.slice(name.length));await ANKI.putMany('decks',rows)}
       toast(L('Đã lưu','Saved'));close()};
     q('#obrowse').onclick=()=>{v.remove();TAB='browse';BR.q=`deck:"${name}"`;BR.sel=null;render()};
@@ -1240,7 +1252,7 @@ function renderAnki(){
      </div></div>
    <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span class="akleft">${AK.debt!=null?`<b class="dbt">${AK.debt+AK.list.slice(AK.i).filter(c=>c.card.state===2).length}</b> ${L('thẻ nợ còn lại','debt left')}<span style="display:none">`:''}<b class="cn">${cnt.n}</b> ${L('mới','new')}<b class="cl">${cnt.l}</b> ${L('đang học','learning')}<b class="cr">${cnt.r}</b> ${L('ôn','review')}${AK.debt!=null?'</span>':''}</span><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
    ${autoBarHTML(AK.auto,P.autoQ,P.autoA,P.autoAct,{grade:true})}
-   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc ${okColor(deckColor(it.deck,AK.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,AK.decks))||'transparent'}"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
   {const d=$('#akdog'),A=AK.dogAct;if(d&&A&&Date.now()-A[1]<500){const e=(Date.now()-A[1])/1000;d.querySelector('.sf').style.animationDelay=-e+'s';d._s=setTimeout(()=>{d.classList.remove('yay','sad');d.querySelector('.sf').style.animationDelay=''},(A[0]==='yay'?900:1300)-e*1000)}}
@@ -1657,7 +1669,7 @@ const SYNC=(()=>{
           const c=byId.get(id);if(!c)continue;const rec=await recOf(c);const r=data[id];if(!r||r.mt<=rec.mt)data[id]=rec}
         await push(k,data,R[k].ut)}
     }
-    if(metaDirty){const decks=(await raw.all('decks')).map(d=>{const o={id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0};if(d.mode)o.mode=d.mode;if(d.ord!=null)o.ord=d.ord;return o});
+    if(metaDirty){const decks=(await raw.all('decks')).map(d=>{const o={id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0};if(d.mode)o.mode=d.mode;if(d.ord!=null)o.ord=d.ord;if(d.color!=null)o.color=d.color;return o});
       const M=R.meta.data||{};const dx=(M.dx||[]).slice();(ls.get('shiratama-deckdel',[])||[]).forEach(id=>{if(!dx.includes(id))dx.push(id)});
       const mt=Math.max(metaDirty,Date.now());await push('meta',{mt,decks,dx,presets:ls.get('shiratama-presets',null)},R.meta.ut);ls.set('shiratama-metamt',mt)}
     // xóa đánh dấu những gì đã gửi xong (thẻ sửa trong lúc đang đồng bộ thì giữ lại cho lần sau)

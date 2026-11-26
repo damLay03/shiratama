@@ -1004,3 +1004,12 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .debtbar .grow{font-size:14px;color:var(--ink2)}.debtbar .dgo{font-size:13px;font-weight:800;color:var(--ink2)}
 .prog .akleft .dbt{color:var(--ng)}
 .debtbig{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}.debtbig b{font-size:40px;font-weight:800;color:var(--ng);line-height:1}.debtbig span{font-size:14px;color:var(--ink2);font-weight:700}
+/* v71: màu deck */
+.dcpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.dcs{position:relative;width:38px;height:38px;border-radius:50%;border:0;background:var(--c);box-shadow:inset 0 0 0 1.5px var(--line);font-size:10px;font-weight:800;color:var(--ink2);cursor:pointer;display:grid;place-items:center;overflow:hidden}
+.dcs[data-dc=""]{width:auto;padding:0 12px;border-radius:19px;background:var(--line)}
+.dcx{width:auto;padding:0 12px;border-radius:19px;background:color-mix(in srgb,var(--c) 30%,var(--line))}
+.dcx input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.dcs.on{box-shadow:0 0 0 3px var(--card-solid),0 0 0 5.5px var(--ink)}
+.dcol .gc{--gc:var(--dc)}
+.fc.dcol:not(.imgonly) .face{box-shadow:inset 0 7px 0 var(--dc),0 18px 40px -18px rgba(20,40,80,.35)}

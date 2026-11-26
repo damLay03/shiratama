@@ -204,7 +204,7 @@ function shell(inner,{tabs=true}={}){
   window.scrollTo(0,0);
 }
 let LASTPAGE='';
-function full(inner){LASTPAGE='';ensureSky();document.body.classList.add('studying');$('#app').innerHTML=`<div class="sess">${inner}</div>`}
+function full(inner){const had=!!document.querySelector('#app > .sess');LASTPAGE='';ensureSky();document.body.classList.add('studying');$('#app').innerHTML=`<div class="sess${had?' still':''}">${inner}</div>`}
 function greet(){const h=new Date().getHours();return L(h<11?'Chào buổi sáng':h<18?'Chào buổi chiều':'Chào buổi tối',h<11?'Good morning':h<18?'Good afternoon':'Good evening')+L(', anh Nhân',', Nhân')}
 const STUDY_SUB=['home','browse','stats'],EXAM_SUB=['exam','examstats'];
 function mainTab(){return STUDY_SUB.includes(TAB)?'home':EXAM_SUB.includes(TAB)?'exam':'sys'}
@@ -406,7 +406,11 @@ function startFlipDeck(st,set,name){
 function flipItems(){const F=FV;let it=F.all;if(F.only)it=it.filter(isStar);if(F.shuf)it=F.shufOrder?F.shufOrder.filter(c=>it.includes(c)):it;F.items=it;
   if(F.i>=it.length)F.i=Math.max(0,it.length-1)}
 function flipCfg(){S.flipAuto=Object.assign({q:4,a:4},S.flipAuto||{});return S.flipAuto}
-const hasBack=c=>stripHtml(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join('')).trim()!==''||/<img/i.test(String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i).slice(1).join(''));
+// thẻ có mặt sau không: có <hr id=answer> thì xét phần sau nó; mẫu Anki riêng không có <hr> thì so mặt sau với mặt trước
+const hasBack=c=>{const B=String(c.back||''),parts=B.split(/<hr id=["']?answer["']?\s*\/?>/i);
+  if(parts.length>1){const a=parts.slice(1).join('');return stripHtml(a).trim()!==''||/<img/i.test(a)}
+  const b=stripHtml(B).replace(/\s+/g,' ').trim(),f=stripHtml(String(c.front||'')).replace(/\s+/g,' ').trim();
+  if(!b&&!/<img/i.test(B))return false;return b!==f&&b.replace(f,'').trim()!==''||(/<img/i.test(B)&&!/<img/i.test(String(c.front||'')))};
 function renderFlip(){return FV.view==='list'?renderFlipList():renderFlipCard()}
 function flipTop(extra){const F=FV,n=F.all.filter(isStar).length;
   return `<div class="sbar fvbar"><button class="iconbtn" id="fvq" aria-label="${L('Đóng','Close')}">${F.view==='list'?I.x:I.back}</button>
@@ -461,12 +465,12 @@ function renderFlipCard(){
    <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''} ${okColor(deckColor(it.deck,F.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,F.decks))||'transparent'}"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
      <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg><span class="fmore" id="fmore"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></div>
 </div>`);
-  ANKI.hydrate($('#fc'));
+  ANKI.hydrate($('#fc'));if(F.enter){const e=$('#fc');e.classList.add('enter',F.enter==='r'?'er':'el');F.enter=null}
   bindFlipTop();bindSizeBtn(()=>setTimeout(moreHint,30));
   const ring=sec=>{const r=$('#aring');if(!r)return;r.classList.remove('run');void r.getBBox();r.style.setProperty('--t',sec+'s');r.classList.add('run')};
   const unring=()=>{const r=$('#aring');if(r)r.classList.remove('run')};
   const go=k=>{clearTimeout(F.at);if(k>=N){F.auto=false;F.view='list';toast(L('Hết lượt lướt','End of deck'));render();return}if(k<0)return;
-    F.i=k;F.show=false;if(!F.shuf&&!F.only){S.flipPos[F.key]=F.all.indexOf(F.items[k]);save()}renderFlipCard()};
+    F.enter=k>F.i?'r':'l';F.i=k;F.show=false;if(!F.shuf&&!F.only){S.flipPos[F.key]=F.all.indexOf(F.items[k]);save()}renderFlipCard()};
   const next=()=>go(F.i+1),prev=()=>go(F.i-1);
   const flip=()=>{if(!two)return;F.show=!F.show;SFX.play('flip');$('#fc').classList.toggle('flip',F.show);arm()};
   const star=async(adv)=>{const on=!isStar(it);await setStar(it,on);const b=$('#fvstar');if(b)b.classList.toggle('on',on);const s=$('#fvonly small');if(s)s.textContent=F.all.filter(isStar).length;
@@ -481,8 +485,9 @@ function renderFlipCard(){
   const stage=$('#stage'),fc=$('#fc');let sx=0,sy=0,down=false,busy=false;
   const ry=()=>F.show?' rotateY(180deg)':'';
   const fly=(dir,then)=>{if(busy)return;busy=true;clearTimeout(F.at);fc.style.transition='transform .26s ease-in,opacity .26s';
-    fc.style.transform=dir==='u'?`translateY(-115%) scale(.9)${ry()}`:`translateX(${dir==='l'?-125:125}%) rotate(${dir==='l'?-14:14}deg)${ry()}`;fc.style.opacity='0';
-    SFX.play(dir==='u'?'ok':'flip');setTimeout(then,220)};
+    // lướt thẻ chỉ đổi thẻ nhẹ nhàng, không bay đi như chấm Quên/Nhớ; vuốt lên gắn sao vẫn bay lên
+    if(dir==='u'){fc.style.transform=`translateY(-115%) scale(.9)${ry()}`;fc.style.opacity='0';SFX.play('ok');setTimeout(then,220);return}
+    fc.style.transition='transform .16s ease-out,opacity .16s';fc.style.transform=`translateX(${dir==='l'?-18:18}px)${ry()}`;fc.style.opacity='0';SFX.play('flip');setTimeout(then,150)};
   const toNext=()=>{if(F.i>=N-1)return next();fly('l',next)},toPrev=()=>{if(!F.i){snap();return}fly('r',prev)};
   const snap=()=>{fc.style.transition='transform .25s cubic-bezier(.3,1.5,.5,1)';fc.style.transform=F.show?'rotateY(180deg)':''};
   const face=()=>fc.querySelector(F.show?'.back':'.front');

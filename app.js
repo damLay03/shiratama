@@ -743,6 +743,9 @@ function ankiQueue(cards,deckSet,decks,topName){
   const cap=(list,key,field)=>{const used={};return list.filter(c=>{const P=presetOf(byId[c.deck]);const lim=P[field];used[c.deck]=(used[c.deck]||0)+1;return used[c.deck]+((D[key]||{})[c.deck]||0)<=lim})};
   let R=rev.slice();
   if(TP.revOrder==='random')R=shuffle(R);else if(TP.revOrder==='retr')R.sort((a,b)=>retr(a,now)-retr(b,now));else R.sort((a,b)=>new Date(a.card.due)-new Date(b.card.due));
+  // kho nợ: thẻ quá hạn từ hôm trước chỉ được đưa vào phần ôn mỗi ngày tối đa S.debtDrip thẻ (sắp quên nhất trước), còn lại nằm trong kho
+  const drip=S.debtDrip===undefined?50:S.debtDrip;
+  if(drip>=0&&drip<99999){const ds=de-864e5;const dbt=R.filter(c=>new Date(c.card.due).getTime()<ds).sort((a,b)=>retr(a,now)-retr(b,now));const ks=new Set(dbt.slice(0,drip));R=R.filter(c=>new Date(c.card.due).getTime()>=ds||ks.has(c))}
   R=cap(R,'rv','revDay');
   let N=fresh.slice();N.sort((a,b)=>(a.created||parseInt(String(a.id).slice(1),10)||0)-(b.created||parseInt(String(b.id).slice(1),10)||0));if(TP.newOrder==='random')N=shuffle(N);
   N=cap(N,'nw','newDay');
@@ -755,6 +758,16 @@ function ankiQueue(cards,deckSet,decks,topName){
 function backlog(st){const now=Date.now(),de=dayEnd(),ds=de-864e5,fl=flipIds(st.decks||[]);
   const due=st.cards.filter(c=>!c.susp&&!fl.has(c.deck)&&c.card.state===2&&new Date(c.card.due).getTime()<=de);
   return {due,over:due.filter(c=>new Date(c.card.due).getTime()<ds).length,now,de,fl}}
+// thẻ đã giãn mà chưa ôn, vẫn còn nằm ở các ngày sau
+function postponed(st,de){const snap=ls.get('shiratama-giano',null);if(!snap||!snap.ids)return [];
+  return st.cards.filter(c=>snap.ids[c.id]&&!(c.appAt>snap.at)&&!c.susp&&c.card.state===2&&new Date(c.card.due).getTime()>de)}
+// trả hết nợ một lần: mọi thẻ ôn đến hạn (bỏ qua giới hạn mỗi ngày) + thẻ đã giãn, thẻ sắp quên nhất trước
+function debtCards(st){const B=backlog(st);const ds=B.de-864e5;const seen=new Set();
+  return B.due.filter(c=>new Date(c.card.due).getTime()<ds).concat(postponed(st,B.de)).filter(c=>!seen.has(c.id)&&seen.add(c.id))}
+function startDebt(n){ankiState(true).then(st=>{const now=Date.now();const all=debtCards(st).sort((a,b)=>retr(a,now)-retr(b,now));
+  if(!all.length){toast(L('Hết nợ rồi!','No debt left!'));return}
+  const list=n?all.slice(0,n):all;
+  AK={list,i:0,show:false,a:0,g:0,hist:[],title:L('Trả nợ','Catch up'),decks:st.decks,t0:now,debt:all.length-list.length};render()})}
 function gianoDialog(st,done){
   const B=backlog(st);const tot=B.due.length;const snap=ls.get('shiratama-giano',null);
   const byR=B.due.slice().sort((a,b)=>retr(a,B.now)-retr(b,B.now)); // sắp quên nhất trước
@@ -767,7 +780,13 @@ function gianoDialog(st,done){
     let rs=0;asg.forEach(([c,k])=>{rs+=retr(c,B.de+(k-1)*864e5+36e5)});
     return {asg,load,avg:asg.length?rs/asg.length:1}}
   function draw(){const P=plan();const mx=Math.max(keep,...P.load,1);
-    v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px">${L('Giãn nợ thẻ ôn','Spread out overdue reviews')}</div><button class="iconbtn" id="gnx">${I.x}</button></div>
+    v.innerHTML=`<div class="panel"><div class="row" style="margin-bottom:6px"><div class="grow" style="font-weight:800;font-size:18px">${L('Kho nợ thẻ ôn','Review debt box')}</div><button class="iconbtn" id="gnx">${I.x}</button></div>
+    ${(()=>{const n=debtCards(st).length;return n?`<div class="debtbig"><b>${n}</b><span>${L('thẻ nợ trong kho','cards in your debt box')}</span></div><div class="ot">${L('Trả một lượt','Pay a round')}</div>
+    <div class="seg">${[20,50,100,0].filter(k=>!k||k<n).map(k=>`<button data-gpay="${k}">${k?k+L(' thẻ',''):L('Hết','All')}</button>`).join('')}</div>
+    <div class="ot" style="margin-top:16px">${L('Mỗi ngày tự đưa vào phần ôn','Added to daily reviews')}</div>
+    <div class="seg">${[[0,'0'],[20,'20'],[50,'50'],[100,'100'],[99999,L('Tất cả','All')]].map(([k,l])=>`<button data-gdrip="${k}" class="${(S.debtDrip===undefined?50:S.debtDrip)===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="tiny" style="margin-top:6px">${L('Mỗi lượt ôn những thẻ nợ sắp quên nhất trước. Không vào trả thì mỗi ngày app tự lấy vài thẻ nợ (sắp quên nhất) cho vào phần ôn, số còn lại nằm chờ trong kho.','Each round starts with the debt cards you are closest to forgetting.')}</div>`:''})()}
+    <div class="ot" style="margin-top:22px">${L('Hoặc giãn ra nhiều ngày','Or spread over several days')}</div>
     <p class="small muted" style="margin:0 0 14px">${tot?L(`Đang có <b>${tot}</b> thẻ ôn đến hạn, trong đó <b>${B.over}</b> thẻ quá hạn từ hôm trước.`,`<b>${tot}</b> reviews due, <b>${B.over}</b> overdue from earlier days.`):L('Không có thẻ ôn nào đến hạn.','No reviews due.')}</p>
     ${tot?`<div class="ot">${L('Giữ lại hôm nay','Keep for today')}</div>
     <div class="row"><input type="range" id="gnk" class="grow" min="0" max="${tot}" value="${keep}" style="accent-color:var(--bee-deep)"><b style="min-width:52px;text-align:right;font-size:18px">${keep}</b></div>
@@ -779,7 +798,9 @@ function gianoDialog(st,done){
     <button class="btn bee" id="gngo" style="width:100%;margin-top:14px" ${P.asg.length?'':'disabled'}>${L(`Giãn ${P.asg.length} thẻ`,`Postpone ${P.asg.length} cards`)}</button>`:''}
     ${snap?`<button class="btn line" id="gnun" style="width:100%;margin-top:10px">${L(`Hoàn tác lần giãn trước (${Object.keys(snap.ids).length} thẻ)`,`Undo last postpone (${Object.keys(snap.ids).length} cards)`)}</button>`:''}
     <div class="tiny" style="margin-top:12px">${L('Không xóa thẻ, không đổi độ nhớ. Thẻ lùi mà sau đó vẫn nhớ thì lần sau còn giãn xa hơn. Muốn ôn ít nợ lâu dài thì giảm số thẻ mới mỗi ngày.','Nothing is deleted. Postponed cards you still remember get even longer intervals. To keep reviews low long-term, lower new cards per day.')}</div></div>`;
-    v.querySelector('#gnx').onclick=()=>v.remove();
+    v.querySelector('#gnx').onclick=()=>{v.remove();done&&done()};
+    v.querySelectorAll('[data-gdrip]').forEach(b=>b.onclick=()=>{S.debtDrip=+b.dataset.gdrip;save();dropState();draw()});
+    v.querySelectorAll('[data-gpay]').forEach(b=>b.onclick=()=>{v.remove();startDebt(+b.dataset.gpay)});
     const k=v.querySelector('#gnk');if(k)k.oninput=()=>{keep=+k.value;S.gianoKeep=keep;save();draw();const k2=v.querySelector('#gnk');if(k2)k2.focus()};
     v.querySelectorAll('[data-gd]').forEach(b=>b.onclick=()=>{days=+b.dataset.gd;S.gianoDays=days;save();draw()});
     const go=v.querySelector('#gngo');if(go)go.onclick=async()=>{go.disabled=true;const ids={};const rows=P.asg.map(([c,k])=>{const old=c.card.due;ids[c.id]=typeof old==='string'?old:new Date(old).toISOString();
@@ -819,7 +840,7 @@ async function ankiBox(){
      <div class="hero-n">${nAll}<span> ${L('thẻ','cards')}</span></div>
      <div class="hero-split"><span><i class="dot nw"></i>${L('Mới','New')} <b>${tot.fresh.length}</b></span><span><i class="dot ln"></i>${L('Đang học','Learning')} <b>${tot.learn.length}</b></span><span><i class="dot rv"></i>${L('Ôn','Review')} <b>${tot.rev.length}</b></span></div>
      <button class="btn bee big" id="ankiAll" ${nAll?'':'disabled'}>${nAll?L('Học ngay','Study now'):L('Xong hết rồi','All done')}</button>
-     ${(()=>{const B=backlog(st);return B.due.length>tot.rev.length||B.over>=20?`<button class="btn line gnbtn" id="gnopen">${I.clock||''}${L(`Giãn nợ · ${B.due.length} thẻ ôn đến hạn`,`Spread out · ${B.due.length} reviews due`)}</button>`:''})()}
+     ${(()=>{const debt=debtCards(st).length;return debt?`<button class="debtbar" id="gnopen"><span class="dl">${L('Kho nợ','Debt box')}</span><b>${debt}</b><span class="grow">${L('thẻ ôn','reviews')}</span><span class="dgo">${L('Vào trả','Open')} ›</span></button>`:''})()}
      <div class="tiny center" style="margin-top:10px">${L(`Đã học ${D.n} thẻ · ${Math.round(D.ms/60000)} phút hôm nay`,`${D.n} cards · ${Math.round(D.ms/60000)} min today`)}</div>
    </div>
    <div class="tools">
@@ -1194,7 +1215,9 @@ function schedule(card,g,P){
 const revType=s=>s===2?1:s===3?2:0;
 function renderAnki(){
   const it=AK.list[AK.i];
-  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('big','','done')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};return}
+  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('big','','done')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};
+    ankiState(true).then(st=>{const n=debtCards(st).length;const k=document.getElementById('akb');if(!n||!k)return;
+      const b=document.createElement('button');b.className='btn line';b.style.cssText='display:block;margin:10px auto 0';b.textContent=L(`Còn nợ ${n} thẻ · trả tiếp`,`${n} cards behind · keep going`);b.onclick=()=>gianoDialog(st,()=>{AK=null;TAB='home';render()});k.after(b)}).catch(()=>{});return}
   const deck=AK.decks.find(d=>d.id===it.deck);const P=presetOf(deck);
   const left=AK.list.length-AK.i;
   const cnt={n:0,l:0,r:0};AK.list.slice(AK.i).forEach(c=>{const s=c.card.state;if(s===0)cnt.n++;else if(s===2)cnt.r++;else cnt.l++});
@@ -1209,7 +1232,7 @@ function renderAnki(){
        <button id="akmu" class="${MUSIC.on?'on':''}">${I.note}<span>${L('Nhạc nền','Music')}</span></button>
        <button id="akedit">${I.pen}<span>${L('Sửa thẻ này','Edit this card')}</span></button>
      </div></div>
-   <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span class="akleft"><b class="cn">${cnt.n}</b> ${L('mới','new')}<b class="cl">${cnt.l}</b> ${L('đang học','learning')}<b class="cr">${cnt.r}</b> ${L('ôn','review')}</span><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
+   <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span class="akleft">${AK.debt!=null?`<b class="dbt">${AK.debt+AK.list.slice(AK.i).filter(c=>c.card.state===2).length}</b> ${L('thẻ nợ còn lại','debt left')}<span style="display:none">`:''}<b class="cn">${cnt.n}</b> ${L('mới','new')}<b class="cl">${cnt.l}</b> ${L('đang học','learning')}<b class="cr">${cnt.r}</b> ${L('ôn','review')}${AK.debt!=null?'</span>':''}</span><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
    ${autoBarHTML(AK.auto,P.autoQ,P.autoA,P.autoAct,{grade:true})}
    <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc" id="fc"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);

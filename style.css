@@ -998,3 +998,9 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .gnb.today i{background:var(--bee-deep);opacity:1}
 .gnb b{font-size:11px;color:var(--ink2)}.gnb span{font-size:10.5px;color:var(--ink3);white-space:nowrap}
 .gninfo{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--line);font-size:14px;line-height:1.45}
+.debtbar{width:100%;margin-top:12px;display:flex;align-items:center;gap:8px;border:0;border-radius:16px;padding:12px 14px;background:rgba(226,87,76,.1);color:var(--ink);font:inherit;text-align:left;cursor:pointer}
+.debtbar .dl{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--ng)}
+.debtbar b{font-size:24px;font-weight:800;color:var(--ng);font-variant-numeric:tabular-nums}
+.debtbar .grow{font-size:14px;color:var(--ink2)}.debtbar .dgo{font-size:13px;font-weight:800;color:var(--ink2)}
+.prog .akleft .dbt{color:var(--ng)}
+.debtbig{display:flex;align-items:baseline;gap:10px;margin:2px 0 14px}.debtbig b{font-size:40px;font-weight:800;color:var(--ng);line-height:1}.debtbig span{font-size:14px;color:var(--ink2);font-weight:700}

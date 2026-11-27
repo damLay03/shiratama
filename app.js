@@ -487,7 +487,7 @@ function renderFlipCard(){
   const fly=(dir,then)=>{if(busy)return;busy=true;clearTimeout(F.at);fc.style.transition='transform .26s ease-in,opacity .26s';
     // lướt thẻ chỉ đổi thẻ nhẹ nhàng, không bay đi như chấm Quên/Nhớ; vuốt lên gắn sao vẫn bay lên
     if(dir==='u'){fc.style.transform=`translateY(-115%) scale(.9)${ry()}`;fc.style.opacity='0';SFX.play('ok');setTimeout(then,220);return}
-    fc.style.transition='transform .16s ease-out,opacity .16s';fc.style.transform=`translateX(${dir==='l'?-18:18}px)${ry()}`;fc.style.opacity='0';SFX.play('flip');setTimeout(then,150)};
+    fc.style.transition='transform .22s cubic-bezier(.5,0,.75,0),opacity .22s';fc.style.transform=`translateX(${dir==='l'?-110:110}%)${ry()}`;fc.style.opacity='.2';SFX.play('flip');setTimeout(then,200)};
   const toNext=()=>{if(F.i>=N-1)return next();fly('l',next)},toPrev=()=>{if(!F.i){snap();return}fly('r',prev)};
   const snap=()=>{fc.style.transition='transform .25s cubic-bezier(.3,1.5,.5,1)';fc.style.transform=F.show?'rotateY(180deg)':''};
   const face=()=>fc.querySelector(F.show?'.back':'.front');

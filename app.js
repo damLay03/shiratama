@@ -401,6 +401,7 @@ function startFlipDeck(st,set,name){
   const rank={};secs.forEach((x,k)=>rank[x.id]=k);
   const all=st.cards.filter(c=>!c.susp&&set.has(c.deck)).sort((a,b)=>(rank[a.deck]-rank[b.deck])||createdAt(a)-createdAt(b)||String(a.id).localeCompare(String(b.id)));
   if(!all.length){toast(L('Deck này chưa có thẻ','This deck has no cards'));return}
+  fixOneSided(all);
   S.flipPos=S.flipPos||{};FV={decks:st.decks,key:'d:'+name,title:name.split('::').pop(),secs,col:new Set(ls.get('shiratama-fcol:'+name,null)||(secs.filter(x=>all.some(c=>c.deck===x.id)).length>1?secs.map(x=>x.id):[])),all,only:!!(S.flipOnly||{})[name],name,shuf:false,view:'list',i:0,show:false,auto:false};
   flipItems();render()}
 function flipItems(){const F=FV;let it=F.all;if(F.only)it=it.filter(isStar);if(F.shuf)it=F.shufOrder?F.shufOrder.filter(c=>it.includes(c)):it;F.items=it;
@@ -1013,15 +1014,26 @@ const newGuid=()=>{const a='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ
 const emptyCard=()=>({due:new Date(),stability:0,difficulty:0,elapsed_days:0,scheduled_days:0,reps:0,lapses:0,state:0,learning_steps:0});
 function makeCard(deck,front,back,tags){const id='n'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
   return {id,deck,guid:newGuid(),fl:[front,back],front,back:front+'<hr id=answer>'+back,tags:tags||'',appAt:0,created:Date.now(),card:emptyCard()}}
+function deEnt(s){return String(s).replace(/&#x0*9;|&#0*9;/gi,'\t').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#0*39;|&#x0*27;/gi,"'").replace(/&amp;/g,'&')}
+function splitFB(F){F=String(F||'');if(!F.includes('\t')&&/&#x0*9;|&#0*9;|&lt;\/?(b|br|div|i|u|span|p)\b/i.test(F))F=deEnt(F);
+  let i=F.indexOf('\t');if(i>=0){const a=F.slice(0,i).trim(),b=F.slice(i+1).replace(/\t[^\t]*$/,'').trim();return a&&b?[a,b]:null}
+  const m=F.match(/^([^<]*?[^<\s])\s*((?:<br\s*\/?>\s*)*<(?:b|div|p|i|u|span|ul|ol)\b[\s\S]*)$/i);
+  if(m&&stripHtml(m[2]).trim())return [m[1].trim(),m[2].replace(/^(\s*<br\s*\/?>)+/i,'').trim()];return null}
 function parsePaste(txt){
-  let deckName=null;const out=[];
+  let deckName=null,tagCol=0;const out=[];
   txt.split(/\r?\n/).forEach(line=>{if(!line.trim())return;
     const m=line.match(/^#deck:\s*(.+)$/i);if(m){deckName=m[1].trim();return}
+    const tc=line.match(/^#tags column:\s*(\d+)/i);if(tc){tagCol=+tc[1];return}
     if(line.startsWith('#'))return;
-    const i=line.indexOf('\t');if(i<0)return out.push({err:line});
-    out.push({front:line.slice(0,i).trim(),back:line.slice(i+1).trim()})});
+    if(!line.includes('\t')&&/&#x0*9;|&#0*9;/i.test(line))line=deEnt(line);
+    const i=line.indexOf('\t');if(i<0){const r=splitFB(line);return out.push(r?{front:r[0],back:r[1],tags:''}:{err:line})}
+    let back=line.slice(i+1),tags='';if(tagCol===3){const j=back.lastIndexOf('\t');if(j>=0){tags=back.slice(j+1).trim();back=back.slice(0,j)}}
+    out.push({front:line.slice(0,i).trim(),back:back.trim(),tags})});
   return {deckName,rows:out};
 }
+function fixOneSided(cards){const fx=[];cards.forEach(c=>{if(!String(c.id).startsWith('n')||hasBack(c))return;const r=splitFB(fieldsOf(c)[0]);if(!r)return;
+  c.fl=[r[0],r[1]];c.front=r[0];c.back=r[0]+'<hr id=answer>'+r[1];c.edited=1;fx.push(c)});
+  if(fx.length){ANKI.putMany('cards',fx).catch(()=>{});toast(L(`Đã tách mặt sau cho ${fx.length} thẻ`,`Split ${fx.length} cards into front/back`))}return fx.length}
 async function addCards(deckId){
   const st=await ankiState();
   const decks=st.decks.slice().sort((a,b)=>a.name.localeCompare(b.name));
@@ -1058,14 +1070,14 @@ async function addCards(deckId){
     if(mode==='img'){const fs=[...v.querySelector('#afiles').files];if(!fs.length)return;const bk=v.querySelector('#aib').value.trim();const add=[];
       for(let k=0;k<fs.length;k++){v.querySelector('#aiinfo').textContent=L(`Đang xử lý ảnh ${k+1}/${fs.length}…`,`Processing ${k+1}/${fs.length}…`);try{const n=await imgToCard(fs[k]);const im=`<img src="${n}">`;const c=v.querySelector('#aipos').value==='front'?makeCard(deck,im,bk,''):makeCard(deck,esc(fs[k].name.replace(/\.[^.]+$/,'')),im,'');c.created+=k;add.push(c)}catch(e){console.warn(e)}}
       if(add.length)await ANKI.putMany('cards',add);toast(L(`Đã thêm ${add.length} thẻ ảnh`,`Added ${add.length} image cards`));close();return}
-    if(mode==='one'){const f=v.querySelector('#af').value.trim(),b=v.querySelector('#ab').value.trim();if(!f)return;
+    if(mode==='one'){let f=v.querySelector('#af').value.trim(),b=v.querySelector('#ab').value.trim();if(!f)return;if(!b){const r=splitFB(f);if(r&&!/\n/.test(f)){f=r[0];b=r[1]}}
       await ANKI.put('cards',makeCard(deck,f,b,v.querySelector('#at').value.trim()));toast(L('Đã thêm 1 thẻ','Added 1 card'));v.querySelector('#af').value='';v.querySelector('#ab').value='';v.querySelector('#af').focus();dropState();return}
     const r=parsePaste(v.querySelector('#atxt').value);
     if(r.deckName){let d=(await ANKI.all('decks')).find(x=>x.name===r.deckName);if(!d){d={id:'d'+Date.now(),name:r.deckName,at:Date.now(),cfgId:'1'};await ANKI.put('decks',d)}deck=d.id}
     const byFront={};all.filter(c=>c.deck===deck).forEach(c=>byFront[stripHtml(fieldsOf(c)[0]).trim()]=c);
     const over=v.querySelector('#aover').checked;const add=[],upd=[];let dup=0;const seen=new Set();
     r.rows.filter(x=>!x.err).forEach(x=>{const k=stripHtml(x.front).trim();if(seen.has(k))return;seen.add(k);const ex=byFront[k];
-      if(ex){if(over){ex.fl=[x.front,x.back];ex.front=x.front;ex.back=x.front+'<hr id=answer>'+x.back;ex.edited=1;upd.push(ex)}else dup++}else add.push(makeCard(deck,x.front,x.back))});
+      if(ex){if(over){ex.fl=[x.front,x.back];ex.front=x.front;ex.back=x.front+'<hr id=answer>'+x.back;ex.edited=1;upd.push(ex)}else dup++}else add.push(makeCard(deck,x.front,x.back,x.tags))});
     if(add.length)await ANKI.putMany('cards',add);if(upd.length)await ANKI.putMany('cards',upd);
     toast(L(`Đã thêm ${add.length} thẻ${upd.length?`, cập nhật ${upd.length}`:''}${dup?`, bỏ qua ${dup} thẻ trùng`:''}`,`Added ${add.length}${upd.length?`, updated ${upd.length}`:''}${dup?`, skipped ${dup} duplicates`:''}`));
     close()};

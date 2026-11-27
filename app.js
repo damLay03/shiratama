@@ -462,7 +462,7 @@ function renderFlipCard(){
   full(`${flipTop(`<b>${F.i+1}</b><span class="tiny"> / ${N}${sec?` · ${esc(sec)}`:''}</span>`)}
    <div class="prog"><i style="width:${Math.round((F.i+1)/N*100)}%"></i></div>
    ${autoBarHTML(F.auto,cfg.q,cfg.a,null,{always:true})}
-   <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''} ${okColor(deckColor(it.deck,F.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,F.decks))||'transparent'}"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
+   <div class="deckwrap flipwrap" id="akwrap"><div class="stage fvstage" id="stage"><div class="fc ${F.show?'flip':''} ${/class="gt"/.test(it.front)&&!hasBack(it)?'imgonly':''} ${okColor(deckColor(it.deck,F.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,F.decks))||'transparent'}"><div class="face front"><div class="fin">${frontOnly(it.front)}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div>
      <span class="starmark ${isStar(it)?'on':''}" id="fvstar" aria-hidden="true">★</span><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg><span class="fmore" id="fmore"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span></div>
 </div>`);
   ANKI.hydrate($('#fc'));if(F.enter){const e=$('#fc');e.classList.add('enter',F.enter==='r'?'er':'el');F.enter=null}
@@ -1210,6 +1210,8 @@ function startAnki(deckSet,name){
     AK={list,i:0,show:false,a:0,g:0,hist:[],title:name?name.split('::').pop():'',decks:st.decks,t0:Date.now()};render();
   });
 }
+// cho phép dán cả hai mặt vào ô mặt trước, ngăn bằng <hr id=answer>: mặt trước chỉ hiện phần trên
+function frontOnly(f){return String(f).split(/<hr id=["']?answer["']?\s*\/?>/i)[0]}
 function backHTML(it){
   const parts=String(it.back).split(/<hr id=["']?answer["']?\s*\/?>/i);
   if(parts.length<2)return it.back;
@@ -1257,7 +1259,7 @@ function renderAnki(){
      </div></div>
    <div class="prog"><i style="width:${tot?Math.round(done/tot*100):0}%"></i><span class="akleft">${AK.debt!=null?`<b class="dbt">${AK.debt+AK.list.slice(AK.i).filter(c=>c.card.state===2).length}</b> ${L('thẻ nợ còn lại','debt left')}<span style="display:none">`:''}<b class="cn">${cnt.n}</b> ${L('mới','new')}<b class="cl">${cnt.l}</b> ${L('đang học','learning')}<b class="cr">${cnt.r}</b> ${L('ôn','review')}${AK.debt!=null?'</span>':''}</span><span><b class="a">${AK.a}</b> · <b class="g">${AK.g}</b></span></div>
    ${autoBarHTML(AK.auto,P.autoQ,P.autoA,P.autoAct,{grade:true})}
-   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc ${okColor(deckColor(it.deck,AK.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,AK.decks))||'transparent'}"><div class="face front"><div class="fin">${it.front}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
+   <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc ${okColor(deckColor(it.deck,AK.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,AK.decks))||'transparent'}"><div class="face front"><div class="fin">${frontOnly(it.front)}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
   {const d=$('#akdog'),A=AK.dogAct;if(d&&A&&Date.now()-A[1]<500){const e=(Date.now()-A[1])/1000;d.querySelector('.sf').style.animationDelay=-e+'s';d._s=setTimeout(()=>{d.classList.remove('yay','sad');d.querySelector('.sf').style.animationDelay=''},(A[0]==='yay'?900:1300)-e*1000)}}

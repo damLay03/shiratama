@@ -1013,8 +1013,3 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .dcs.on{box-shadow:0 0 0 3px var(--card-solid),0 0 0 5.5px var(--ink)}
 .dcol .gc{--gc:var(--dc)}
 .fc.dcol:not(.imgonly) .face{box-shadow:inset 0 7px 0 var(--dc),0 18px 40px -18px rgba(20,40,80,.35)}
-/* v72: lướt thẻ đổi nhẹ, không bay; không chạy lại hiệu ứng mở màn mỗi thẻ */
-.sess.still{animation:none}
-.fvstage .fc.enter{animation:fcin .3s cubic-bezier(.2,.9,.3,1.04)}
-.fvstage .fc.enter.el{--fx:-100%}.fvstage .fc.enter.er{--fx:100%}
-@keyframes fcin{from{opacity:.2;translate:var(--fx) 0}to{opacity:1;translate:0 0}}

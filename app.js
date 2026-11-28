@@ -33,7 +33,7 @@ const KEY='shiratama-v1';
 const DEF={v:1,ans:{},cards:{},exams:{},theme:'auto',mode:'auto',size:2,lang:'vi'};
 let S=Object.assign(structuredClone(DEF),ls.get(KEY,{}));
 if(S.size==null||!S.size2){S.size=3;S.size2=1} if(!S.size3){const px=SIZES_OLD[S.size]||25;S.size=Math.max(0,SIZES.indexOf(px));S.size3=1} if(!S.mode)S.mode='auto'; if(!S.lang)S.lang='vi';
-const save=()=>ls.set(KEY,S);
+let onSave=null;const save=()=>{ls.set(KEY,S);if(onSave)onSave()};
 let DATA=null, QI={}, SS=null, AK=null, TAB='home';
 
 /* ---------- FSRS ---------- */
@@ -390,10 +390,10 @@ async function seedGram(){
   if(ls.get('shiratama-gramseed',0)>=3&&ls.get('shiratama-gramchk','')===window.APPV)return;
   let H={v:0};try{if(ls.get('shiratama-gramseed',0)>=3){H=await GRAM.htmlAll();if((H.v||0)<=ls.get('shiratama-gramhtml',0)){ls.set('shiratama-gramchk',window.APPV);return}}}catch(e){return}
   try{const g=await GRAM.load();if(!H.v)H=await GRAM.htmlAll().catch(()=>({v:0}));const decks=await ANKI.all('decks');const old={};(await ANKI.all('cards')).forEach(c=>{if(/^gN\d-/.test(c.id))old[c.id]=c});const have=new Set(Object.keys(old));const fix=[];
-    const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];
-    if(!byName[root])nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
+    const byName={};decks.forEach(d=>byName[d.name]=d);const root='Ngữ pháp JLPT';const nd=[];const DX=new Set(ls.get('shiratama-deckdel',[])||[]);
+    if(!byName[root]&&!DX.has('dgram'))nd.push({id:'dgram',name:root,at:Date.now(),cfgId:'1',mode:'flip'});
     const cards=[];const t0=Date.UTC(2026,10,23);
-    GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}
+    GLV.forEach((lv,li)=>{if(!g[lv])return;let d=byName[root+'::'+lv];if(!d){if(DX.has('dgram'+lv)||DX.has('dgram'))return;d={id:'dgram'+lv,name:root+'::'+lv,at:Date.now(),cfgId:'1',ord:li+1};nd.push(d)}if(DX.has(d.id))return;
       g[lv].forEach((x,n)=>{const id='g'+lv+'-'+n;const tag=x.s?'s':'r';
         // thẻ một mặt: tên (ẩn khi lướt, dùng để tìm) + ảnh; không có mặt sau
         const hx=H[lv]&&H[lv][n];const front=hx||`<div class="gt">${gFront(x)}</div><img src="gram:${lv}/${n}${tag}">`,back='';
@@ -1612,7 +1612,13 @@ const SYNC=(()=>{
   let dirty=ls.get('shiratama-dirty',{});       // id thẻ -> mt
   let tomb=ls.get('shiratama-tomb',{});          // id thẻ đã xóa -> lúc xóa
   let metaDirty=ls.get('shiratama-metad',0);
-  const saveDirty=()=>{ls.set('shiratama-dirty',dirty);ls.set('shiratama-tomb',tomb);ls.set('shiratama-metad',metaDirty)};
+  // cài đặt và tiến độ làm đề (S) đồng bộ theo từng mục: mục nào sửa sau cùng thì thắng
+  const SEXC=new Set(['tilt']);
+  let sm=ls.get('shiratama-sm',{})||{};let setDirty=ls.get('shiratama-setd',0);let sprev={};
+  const snapS=()=>{sprev={};Object.keys(S).forEach(k=>{sprev[k]=JSON.stringify(S[k])})};
+  const DXget=()=>new Set(ls.get('shiratama-deckdel',[])||[]);
+  const saveDirty=()=>{ls.set('shiratama-dirty',dirty);ls.set('shiratama-tomb',tomb);ls.set('shiratama-metad',metaDirty);ls.set('shiratama-sm',sm);ls.set('shiratama-setd',setDirty)};
+  function markS(){if(!track)return;const t=Date.now();let ch=0;new Set(Object.keys(S).concat(Object.keys(sprev))).forEach(k=>{if(SEXC.has(k))return;const j=JSON.stringify(S[k]);if(j!==sprev[k]){sm[k]=t;sprev[k]=j;ch=1}});if(ch){setDirty=t;saveDirty();soon()}}
 
   async function idToken(){
     if(AUTH&&AUTH.exp>Date.now()+120000)return AUTH.idToken;
@@ -1626,7 +1632,7 @@ const SYNC=(()=>{
     j=await r.json();AUTH={idToken:j.idToken,refreshToken:j.refreshToken,exp:Date.now()+(+j.expiresIn)*1000};AUTH.p=FB.project;ls.set('shiratama-auth2',AUTH);return AUTH.idToken;
   }
   async function spaceOf(code){const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('shiratama-sync|'+code.trim()));return [...new Uint8Array(b)].slice(0,20).map(x=>x.toString(16).padStart(2,'0')).join('')}
-  const docs=()=>[...Array(NS).keys()].map(String).concat('meta');
+  const docs=()=>[...Array(NS).keys()].map(String).concat('meta','set');
   const path=k=>`shiratama/${SPACE}/s/${k}`;
   async function pull(){
     const r=await fetch(API+ROOT+':batchGet',{method:'POST',headers:{Authorization:'Bearer '+await idToken(),'Content-Type':'application/json'},body:JSON.stringify({documents:docs().map(k=>ROOT+'/'+path(k))})});
@@ -1672,14 +1678,25 @@ const SYNC=(()=>{
     for(const [id,l] of revs){const rv=(await ANKI.getRev(id))||{id,logs:[]};const have=new Set(rv.logs.map(x=>x[0]));let add=0;l.forEach(x=>{if(!have.has(x[0])){rv.logs.push(x);add++}});if(add){rv.logs.sort((a,b)=>a[0]-b[0]);await raw.put('revlog',rv)}}
     // deck và bộ cài đặt
     const M=R.meta&&R.meta.data;
+    // deck đã xóa ở bất kỳ máy nào thì xóa luôn ở máy này, kể cả khi bộ thẻ gốc hay thẻ ngữ pháp vừa nạp lại
+    if(M&&M.dx&&M.dx.length){const dd=ls.get('shiratama-deckdel',[])||[];let add=0;M.dx.forEach(id=>{if(!dd.includes(id)){dd.push(id);add=1}});if(add)ls.set('shiratama-deckdel',dd)}
+    changed+=await purgeDX();
     if(M&&M.mt&&M.mt>(ls.get('shiratama-metamt',0)||0)&&!(metaDirty&&metaDirty>=M.mt)){
       const ld=await raw.all('decks');const lm=new Map(ld.map(d=>[d.id,d]));
       const up=(M.decks||[]).map(d=>Object.assign({},lm.get(d.id)||{},d));if(up.length)await raw.putMany('decks',up);
       for(const id of (M.dx||[]))if(lm.has(id))await raw.del('decks',id);
       if(M.presets)ls.set('shiratama-presets',M.presets);
       ls.set('shiratama-metamt',M.mt);changed++}
+    // cài đặt
+    const ST=R.set&&R.set.data;
+    if(ST&&ST.m){let ch=0;for(const k in ST.m){if(SEXC.has(k))continue;if(ST.m[k]>(sm[k]===1?0.5:(sm[k]||0))){if(k in (ST.v||{}))S[k]=ST.v[k];else delete S[k];sm[k]=ST.m[k];sprev[k]=JSON.stringify(S[k]);ch=1}}
+      if(ch){ls.set(KEY,S);ls.set('shiratama-sm',sm);try{applyLook()}catch(e){}changed++}}
     return changed;
   }
+  async function purgeDX(){const DX=DXget();if(!DX.size)return 0;let n=0;
+    const ds=(await raw.all('decks')).filter(d=>DX.has(d.id));for(const d of ds){await raw.del('decks',d.id);n++}
+    const cs=(await raw.all('cards')).filter(c=>DX.has(c.deck));for(const c of cs){await raw.del('cards',c.id);n++}
+    return n}
   // ảnh anh tự thêm: mỗi ảnh một doc riêng s/m_<tên>, chỉ tải về khi thẻ cần
   const mdoc=n=>'m_'+String(n).replace(/[^\w.-]/g,'_');
   const blobB64=b=>new Promise(r=>{const f=new FileReader();f.onload=()=>r(String(f.result).split(',')[1]);f.readAsDataURL(b)});
@@ -1697,6 +1714,7 @@ const SYNC=(()=>{
     await flushMedia();
     const R=await pull();
     const changed=await applyRemote(R);
+    if(ls.get('shiratama-metainit',0)){ls.set('shiratama-metainit',0);metaDirty=Date.now();setDirty=Date.now();saveDirty()}
     // gửi phần đã đổi trên máy này
     const ids=Object.keys(dirty).concat(Object.keys(tomb));
     if(ids.length){
@@ -1707,12 +1725,15 @@ const SYNC=(()=>{
           const c=byId.get(id);if(!c)continue;const rec=await recOf(c);const r=data[id];if(!r||r.mt<=rec.mt)data[id]=rec}
         await push(k,data,R[k].ut)}
     }
-    if(metaDirty){const decks=(await raw.all('decks')).map(d=>{const o={id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0};if(d.mode)o.mode=d.mode;if(d.ord!=null)o.ord=d.ord;if(d.color!=null)o.color=d.color;return o});
+    if(metaDirty){const DX0=DXget();const decks=(await raw.all('decks')).filter(d=>!DX0.has(d.id)).map(d=>{const o={id:d.id,name:d.name,cfgId:d.cfgId||'1',at:d.at||0};if(d.mode)o.mode=d.mode;if(d.ord!=null)o.ord=d.ord;if(d.color!=null)o.color=d.color;return o});
       const M=R.meta.data||{};const dx=(M.dx||[]).slice();(ls.get('shiratama-deckdel',[])||[]).forEach(id=>{if(!dx.includes(id))dx.push(id)});
       const mt=Math.max(metaDirty,Date.now());await push('meta',{mt,decks,dx,presets:ls.get('shiratama-presets',null)},R.meta.ut);ls.set('shiratama-metamt',mt)}
     // xóa đánh dấu những gì đã gửi xong (thẻ sửa trong lúc đang đồng bộ thì giữ lại cho lần sau)
     ids.forEach(id=>{if(dirty[id]&&dirty[id]<=t0)delete dirty[id];if(tomb[id]&&tomb[id]<=t0)delete tomb[id]});
-    if(metaDirty&&metaDirty<=t0)metaDirty=0;saveDirty();
+    if(setDirty){const T=R.set.data||{};const v=Object.assign({},T.v||{}),m=Object.assign({},T.m||{});let ch=0;
+      Object.keys(sm).forEach(k=>{if(SEXC.has(k))return;if(sm[k]>(m[k]||0)){if(k in S)v[k]=S[k];else delete v[k];m[k]=sm[k];ch=1}});
+      if(ch)await push('set',{v,m},R.set.ut)}
+    if(metaDirty&&metaDirty<=t0)metaDirty=0;if(setDirty&&setDirty<=t0)setDirty=0;saveDirty();
     return changed;
   }
   function paint(){document.querySelectorAll('[data-sync]').forEach(el=>{el.className='syncchip '+st.state;el.innerHTML=chipInner()});const s=document.getElementById('sysync');if(s)s.innerHTML=detail()}
@@ -1757,7 +1778,11 @@ const SYNC=(()=>{
     if(!window.ANKI||SPACE)return;
     SPACE=await spaceOf(code);wrap();
     // lần đầu trên máy này: gửi những thẻ đã học hoặc sửa trong app trước khi có đồng bộ
-    if(!ls.get('shiratama-syncinit',0)){const cs=await raw.all('cards');cs.forEach(c=>{if(c.appAt||c.edited||c.id[0]==='n')dirty[c.id]=c.appAt||Date.now()});metaDirty=Date.now();saveDirty();ls.set('shiratama-syncinit',1)}
+    if(!ls.get('shiratama-syncinit',0)){const cs=await raw.all('cards');cs.forEach(c=>{if(c.appAt||c.edited||c.id[0]==='n')dirty[c.id]=c.appAt||Date.now()});ls.set('shiratama-metainit',1);saveDirty();ls.set('shiratama-syncinit',1)}
+    // bản 79: lần đầu đồng bộ cài đặt trên máy này. Mục nào máy chủ chưa có thì gửi lên, mục máy chủ đã có thì lấy về
+    if(!ls.get('shiratama-setinit',0)){Object.keys(S).forEach(k=>{if(!SEXC.has(k)&&!sm[k])sm[k]=1});setDirty=Date.now();saveDirty();ls.set('shiratama-setinit',1)}
+    snapS();onSave=markS;
+    await purgeDX();
     track=true;run();
     setInterval(()=>{if(!document.hidden)run()},90000);
     document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Object.keys(dirty).length||Object.keys(tomb).length||metaDirty)run()}else run()});

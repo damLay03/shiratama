@@ -1083,3 +1083,78 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 :root[data-mode="night"] .sky .deco .dk{opacity:.8}
 .sky .deco .dk.mid{opacity:.55}
 body.studying .sky .deco .dk.mid{display:none}
+/* ===== v80: đánh bóng giao diện — token dùng chung, trạng thái nút, sửa chồng lấn ===== */
+:root{
+  --r-sm:10px;--r:14px;--r-md:18px;--r-lg:22px;
+  --ctl-sm:36px;--ctl:44px;--ctl-lg:54px;
+  --fs-xs:12px;--fs-sm:13px;--fs:14px;--fs-md:16px;--fs-lg:18px;
+  --ring:0 0 0 3px rgba(255,111,145,.45);
+}
+:root[data-mode="night"]{--ring:0 0 0 3px rgba(255,134,163,.5)}
+/* bo góc theo thang */
+.card,.tabs,.excard,.exhero{border-radius:var(--r-lg)}
+.btn,.seg,input:not([type=range]):not([type=checkbox]):not([type=radio]),select,textarea{border-radius:var(--r)}
+.seg button{border-radius:var(--r-sm)}
+.tool,.btn.big,.debtbar,.sec{border-radius:var(--r-md)}
+/* nút: cao đều, phẳng, không vệt sáng chạy */
+.btn{min-height:var(--ctl);display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2;cursor:pointer}
+.btn.sm{min-height:var(--ctl-sm)}
+.btn.big{min-height:var(--ctl-lg)}
+.btn.bee,:root[data-mode="night"] .btn.bee{background:var(--bee);color:var(--bee-ink);box-shadow:0 3px 0 var(--bee-deep)}
+:root[data-mode="night"] .btn.bee{box-shadow:0 3px 0 #d9607f}
+.btn.bee::after{display:none!important;animation:none!important}
+.iconbtn,.top .iconbtn{width:40px;height:40px;cursor:pointer}
+.btn:disabled,.iconbtn:disabled,.seg button:disabled,.tool:disabled{opacity:.42;cursor:not-allowed;transform:none!important;box-shadow:none}
+@media (hover:hover) and (pointer:fine){
+  .btn:not(:disabled):hover,.tool:hover,.iconbtn:not(:disabled):hover{transform:translateY(-1px)}
+  .btn.bee:not(:disabled):hover{background:#ff7d9c}
+  :root[data-mode="night"] .btn.bee:not(:disabled):hover{background:#ff97b0}
+  .btn.line:not(:disabled):hover{box-shadow:inset 0 0 0 1.5px var(--bee)}
+  .seg button:not(.on):hover,.tabs button:not(.on):hover{color:var(--ink)}
+}
+.btn:focus-visible,.iconbtn:focus-visible,.tool:focus-visible,.seg button:focus-visible,.tabs button:focus-visible,.subnav button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:none;box-shadow:var(--ring)}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;border-color:var(--bee)!important;box-shadow:var(--ring)}
+/* tiêu đề mục: chữ viết tay cỡ đọc được, không viết hoa li ti */
+.h{font-family:var(--hand);font-size:24px;font-weight:400;letter-spacing:0;text-transform:none;color:var(--ink);margin:26px 4px 10px;line-height:1.15}
+.wrap>.h:first-child{margin-top:6px}
+/* màn xong bài */
+.card.done .praise{text-wrap:balance;max-width:20ch;margin-left:auto;margin-right:auto}
+.card.done #akb,.card.done .btn{display:flex!important;width:min(100%,300px);margin:12px auto 0!important}
+.card.done::before{left:auto;right:22px;transform:rotate(5deg)}
+/* thanh tự lướt khi học: nút chạy đủ tương phản, mờ dần mép phải khi tràn */
+.autobar .ab-play{color:var(--bee-deep)}
+.autobar .ab-play.on{color:var(--bee-ink)}
+@media (max-width:699px){.autobar{-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 28px),transparent)}}
+.sbar .ttl small{font-size:12.5px}
+/* bong bóng lời mèo ở thẻ tổng quan trên điện thoại: không che số thẻ */
+@media (max-width:899px){.hero .bubble{max-width:136px;font-size:12.5px;top:-16px;padding:8px 11px}}
+/* sticker nền giữa màn: nhạt hơn để không lấn chữ */
+.sky .deco .dk.mid{opacity:.4}
+:root[data-mode="night"] .sky .deco .dk.mid{opacity:.3}
+/* máy tính: thẻ tổng quan thẳng mép trái với hàng tab */
+@media (min-width:900px){#ankiBox.homegrid{padding-left:0;padding-right:0}}
+/* duyệt thẻ: nút đảo thứ tự trông như một nút */
+.bbar #bdir{width:var(--ctl-sm);height:var(--ctl-sm);background:var(--line);color:var(--ink);font-size:16px;font-weight:800;border-radius:var(--r-sm)}
+@media (max-width:899px){.hero .bubble{top:-24px}}
+/* đêm: nút thường theo bảng màu hồng than, bỏ màu tím lạc tông */
+:root[data-mode="night"] .btn{background:var(--ink);color:var(--card-solid)}
+:root[data-mode="night"] .btn.line{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--line2)}
+:root[data-mode="night"] .btn.soft{background:var(--bee-soft);color:var(--ink)}
+/* thống kê: mèo nhỏ ở đầu thẻ, nút khoảng thời gian không bị cắt */
+.sthead .dog.stk{--dw:54px;flex:0 0 auto;margin:-6px 0;position:relative;inset:auto}
+.sthead .stctl{min-width:0}
+.stctl .seg{flex:1 1 220px;min-width:0}
+.stctl .seg button{white-space:nowrap;padding-left:6px;padding-right:6px}
+/* thanh trên khi học / làm đề: tên chữ tay đủ lớn */
+.sbar .ttl{font-size:18px}
+.sbar .ttl small{font-family:var(--ui)}
+@media (max-width:899px){.hero .bubble{top:-14px;max-width:128px}}
+.sthead select,.sthead button{font-family:var(--ui)}
+/* cá bay ngang chỉ lướt ở nền, không bay đè lên chữ */
+.flyby{z-index:-1}
+/* đầu bộ tự lướt trên điện thoại: chừa chỗ cho mèo, chữ không chạy dưới sticker */
+@media (max-width:699px){.flhero{padding-right:96px}.flhero .dog{--dw:62px!important;top:4px;right:8px}}
+.flhero{border-radius:var(--r-lg)}
+/* máy tính bảng dọc: cột nội dung rộng hơn, thẻ gợi ý đề xếp dọc cho thoáng */
+@media (min-width:700px) and (max-width:899px){.wrap{max-width:660px}.exhero{grid-template-columns:1fr}}
+@media (max-width:699px){.flhero{padding-right:74px}.flhero .dog{--dw:50px!important}}

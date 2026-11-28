@@ -182,9 +182,9 @@ const SKY=`<div class="sky"><div class="sky-grad"></div>
 ${SPARK.map(([x,y,k],i)=>`<img class="spark" src="img/star.webp" alt="" style="left:${x}%;top:${y}%;--k:${k};animation-delay:-${(i*0.7).toFixed(1)}s">`).join('')}
 <div id="shoot"></div></div><div class="paper"></div><div class="deco"></div></div>`;
 // sticker mèo dán lệch khắp nền như sổ dán sticker; mỗi lần mở app đổi bộ khác
-const DECO_SLOTS=[[-4,7,-12],[82,3,10],[-7,30,8],[85,24,-9],[-5,53,-5],[84,47,12],[-6,76,10],[82,72,-7],[36,90,-4],[22,-2,6],[60,-3,-8],[48,38,5],[16,62,-10],[66,84,7]];
+const DECO_SLOTS=[[90,93,-12],[82,3,10],[-7,30,8],[85,24,-9],[-5,53,-5],[84,47,12],[-6,76,10],[82,72,-7],[36,90,-4],[22,-2,6],[60,-3,-8],[48,38,5],[16,62,-10],[66,84,7]];
 const DECO_SIDE=[[-9,13,-12],[79,17,10],[-10,37,8],[81,41,-9],[-9,61,-5],[80,65,12],[-10,85,10],[79,89,-7]];
-function decoFill(){const d=document.querySelector('.sky .deco');if(!d)return;const dm=S.deco||'many';if(dm==='off'){d.innerHTML='';return}let SL=innerWidth<700?DECO_SIDE:DECO_SLOTS;if(dm==='few')SL=SL.filter((_,k)=>k%2===0);const cats=[...STKALL].sort(()=>Math.random()-.5),fish=[...STK.fish].sort(()=>Math.random()-.5);let ci=0,fi=0;
+function decoFill(){const d=document.querySelector('.sky .deco');if(!d)return;const dm=S.deco||'many';if(dm==='off'){d.innerHTML='';return}let SL=innerWidth<1000?DECO_SIDE:DECO_SLOTS;if(dm==='few')SL=SL.filter((_,k)=>k%2===0);const cats=[...STKALL].sort(()=>Math.random()-.5),fish=[...STK.fish].sort(()=>Math.random()-.5);let ci=0,fi=0;
   d.innerHTML=SL.map(([x,y,r],k)=>{const isF=k%4===3;const n=isF?fish[fi++%fish.length]:cats[ci++%cats.length];
     return `<img class="dk${isF?' fish':''}${x>12&&x<76?' mid':''}" src="${stkSrc(n)}" alt="" draggable="false" loading="lazy" style="left:${x}%;top:${y}%;--r:${r}deg;--d:${(k*0.37%2.4).toFixed(2)}s">`}).join('')}
 function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);decoFill();SKYFX.start()}}
@@ -1019,6 +1019,7 @@ async function deckOptions(name){
   };
   document.body.appendChild(v);v.onclick=e=>{if(e.target===v)close()};draw();
 }
+function prevTxt(s){return stripHtml(String(s||'').replace(/<\/(div|p|li|h\d|tr)>|<br\s*\/?>/gi,' · ').replace(/<\/span>(?=\s*<span)/gi,' ')).replace(/(\s*·\s*)+/g,' · ').replace(/\s+/g,' ').replace(/^\s*·\s*|\s*·\s*$/g,'').trim()}
 function stripHtml(s){return String(s||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&')}
 function isSimple(c){return c.fl&&c.fl.length>=2&&(c.edited||String(c.front).trim()===String(c.fl[0]).trim())}
 function fieldsOf(c){if(isSimple(c))return [c.fl[0],c.fl.slice(1).join('<br>')];const parts=String(c.back).split(/<hr id=["']?answer["']?\s*\/?>/i);return [c.front,parts.slice(1).join('')]}
@@ -1140,7 +1141,7 @@ async function browse(){
     const el=$('#brows');if(!el)return;
     $('#bcount').textContent=L(`${list.length} thẻ`,`${list.length} cards`)+(list.length>BR.lim?L(` · hiện ${BR.lim} thẻ đầu`,` · showing first ${BR.lim}`):'');
     el.innerHTML=(list.length?'':`<div class="empty">${dog('','','search')}${L('Không tìm thấy thẻ nào.','No cards found.')}</div>`)+list.slice(0,BR.lim).map(c=>{const [f,b]=fieldsOf(c);const due=c.card.state===0?L('mới','new'):new Date(c.card.due).toLocaleDateString(L('vi-VN','en-GB'));
-      return `<div class="brow ${BR.sel===c.id?'on':''} ${c.susp?'susp':''}" data-id="${esc(c.id)}">${pick?`<input type="checkbox" class="bpk" ${pick.has(c.id)?'checked':''}>`:''}<div class="bt"><span class="bf jp">${esc(stripHtml(f).slice(0,70))}</span><span class="bb">${esc(stripHtml(b).slice(0,90))}</span><span class="tiny">${esc(deckName[c.deck]||'')} · ${due}${c.susp?' · '+L('tạm ẩn','suspended'):''}</span></div></div>`}).join('')+(list.length>BR.lim?`<button class="btn line" id="bmore" style="width:100%;margin-top:8px">${L('Hiện thêm','Show more')}</button>`:'');
+      return `<div class="brow ${BR.sel===c.id?'on':''} ${c.susp?'susp':''}" data-id="${esc(c.id)}">${pick?`<input type="checkbox" class="bpk" ${pick.has(c.id)?'checked':''}>`:''}<div class="bt"><span class="bf jp">${esc(prevTxt(f).slice(0,70))}</span><span class="bb">${esc(prevTxt(b).slice(0,90))}</span><span class="tiny">${esc(deckName[c.deck]||'')} · ${due}${c.susp?' · '+L('tạm ẩn','suspended'):''}</span></div></div>`}).join('')+(list.length>BR.lim?`<button class="btn line" id="bmore" style="width:100%;margin-top:8px">${L('Hiện thêm','Show more')}</button>`:'');
     $$('.brow').forEach(b=>b.onclick=e=>{const id=b.dataset.id;
       if(pick){if(pick.has(id))pick.delete(id);else pick.add(id);const cb=b.querySelector('.bpk');cb.checked=pick.has(id);$('#bpn').textContent=L(`${pick.size} đã chọn`,`${pick.size} selected`);return}
       BR.sel=id;$$('.brow').forEach(x=>x.classList.toggle('on',x===b));editCard(st.cards.find(c=>c.id===id),st,()=>{dropState();browse()})});

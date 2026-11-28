@@ -116,13 +116,26 @@ const I={
 };
 
 /* ---------- Shiratama (chó ong của Na) ---------- */
-const SPRNAME={mini:'logo',perch:'home',buddy:'study',fb:'intro'};
-function dog(cls,id,name){name=name||SPRNAME[(cls||'').split(' ')[0]]||'intro';return `<div class="dog spr sp-${name} ${cls||''}" ${id?`id="${id}"`:''} aria-hidden="true"><i class="sf"></i></div>`}
-// chạy một đoạn khung hình (ví dụ chó nói, chó vui), xong thì về dáng thường
-function sprAct(el,cls,ms){if(!el)return;el.classList.remove('talk','yay','sad');void el.offsetWidth;el.classList.add(cls);clearTimeout(el._s);el._s=setTimeout(()=>el.classList.remove(cls),ms||1800)}
+// v77: linh vật là mèo Mụt Ruồi, sticker cắt từ tranh màu nước Na vẽ (img/st/*.webp)
+const STK={home:['co_chua','gai','dung','con_nho','bung_dua','con_cua','mat','tam','lon_be'],yay:['hun','lena','le_luoi','gia_dinh','tam','lon_be'],sad:['nam_ngua','cong','rinh','rut_ruot','hoan_doi'],fish:['ca_hong','ca_lau_kieng','ca_ro_phi','ca_trau','ca_xanh','tom'],logo:['mat'],people:['hun','lena','gia_dinh','hoan_doi','rut_ruot']};
+const STKALL=[...new Set([...STK.home,...STK.yay,...STK.sad])];
+const pickOne=a=>a[Math.floor(Math.random()*a.length)];
+const stkSrc=n=>'img/st/'+n+'.webp';
+const STKC={};
+function dog(cls,id,name){cls=cls||'';const c0=cls.split(' ')[0];
+  const mood=/\byay\b/.test(cls)||name==='done'?'yay':/\bsad\b/.test(cls)?'sad':'';
+  let n;if(mood)n=(name!=='done'&&STKC['m_'+mood])||pickOne(STK[mood]);else if(c0==='fb')n=pickOne(STK.fish);else if(c0==='mini')n='mat';else{const k=c0||name||'x';n=STKC[k]||(STKC[k]=pickOne(STK.home))}
+  if(mood&&name!=='done'&&id)setTimeout(()=>{const el=document.getElementById(id);if(el&&el.dataset.n===n)sprAct(el,'calm')},2200);
+  return `<div class="dog stk ${cls} st-${n}" ${id?`id="${id}"`:''} data-n="${n}" aria-hidden="true"><img src="${stkSrc(n)}" alt="" draggable="false"></div>`}
+// đổi sticker theo tâm trạng: yay (Nhớ), sad (Quên), talk (bấm vào mèo), calm (về dáng thường)
+function sprAct(el,cls,ms){if(!el)return;const im=el.querySelector('img');if(!im)return;
+  const pool=cls==='yay'?STK.yay:cls==='sad'?STK.sad:STK.home;let n=pickOne(pool);if(pool.length>1)while(n===el.dataset.n)n=pickOne(pool);
+  if(cls==='calm'){const k=(el.className.match(/\b(perch|buddy|big|mini)\b/)||[])[1];if(k&&STKC[k])n=STKC[k]}
+  if(cls==='yay'||cls==='sad')STKC['m_'+cls]=n;el.dataset.n=n;im.src=stkSrc(n);el.classList.remove('talk','yay','sad','pop');void el.offsetWidth;el.classList.add('pop');clearTimeout(el._s);el._s=setTimeout(()=>el.classList.remove('pop'),600)}
 function dogSay(el,txt,ms){if(!el)return;let b=el.querySelector('.bubble');if(!b){b=document.createElement('div');b.className='bubble';el.appendChild(b)}b.textContent=txt;b.classList.remove('show');void b.offsetWidth;b.classList.add('show');clearTimeout(b._t);b._t=setTimeout(()=>b.classList.remove('show'),ms||3200)}
 function dogDo(el,act){if(!el)return;el.classList.remove('hop','tilt','buzz');void el.offsetWidth;el.classList.add(act);clearTimeout(el._d);el._d=setTimeout(()=>el.classList.remove(act),800)}
-const DOG_LINES=()=>[L('Gâu! Học tiếp nha anh.','Woof! Let’s keep going.'),L('Từ nào khó cứ để em canh cho.','I’ll keep an eye on the hard ones.'),L('Uống miếng nước rồi học tiếp nè.','Sip some water, then back to it.'),L('Em bay vòng vòng chờ anh đó.','I’m buzzing around waiting for you.'),L('Một thẻ một thẻ là xong hết thôi.','One card at a time.'),L('Hôm nay trời đẹp ghê.','Lovely sky today.')];
+const DOG_LINES=()=>[L('Meo~ học tiếp nha anh Nhân.','Meow~ let’s keep going.'),L('Thẻ nào khó để Ruồi canh cho.','I’ll guard the hard ones.'),L('Uống miếng nước rồi học tiếp nè.','Sip some water, then back to it.'),L('Ruồi nằm đây chờ anh nè~~','I’m lying here waiting~~'),L('Hun Ruồi một cái rồi học tiếp~','A kiss, then back to it~'),L('Một thẻ một thẻ là xong hết thôi.','One card at a time.'),L('Ruồi có chửa mà vẫn học cùng anh nè.','Even pregnant, I study with you.')];
+const PRAISE=()=>[L('Anh Nhân giỏi quá trời~~','You did amazing~~'),L('Ruồi thương anh nhiều lắm!','Ruồi loves you lots!'),L('Hun anh một cái nè~','Here’s a kiss~'),L('Xong rồi, đi ăn cá thôi!','Done! Fish time!'),L('Bụng Ruồi tròn như trái dưa vì vui~','Round as a melon with joy~'),L('Mai học tiếp với Ruồi nha~','Study with me again tomorrow~')];
 /* ---------- audio ---------- */
 let AU=null,AUQ=null,AUTick=null;
 function stopAudio(){if(AU)AU.pause();clearInterval(AUTick);AUQ=null;const b=$('#aubtn');if(b)b.innerHTML=I.play}
@@ -167,8 +180,14 @@ const SKY=`<div class="sky"><div class="sky-grad"></div>
 <div class="wisp w1"></div><div class="wisp w2"></div><div class="wisp w3"></div>
 <svg class="stars" width="100%" height="100%" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">${STARS}</svg>
 ${SPARK.map(([x,y,k],i)=>`<img class="spark" src="img/star.webp" alt="" style="left:${x}%;top:${y}%;--k:${k};animation-delay:-${(i*0.7).toFixed(1)}s">`).join('')}
-<div id="shoot"></div></div></div>`;
-function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);SKYFX.start()}}
+<div id="shoot"></div></div><div class="paper"></div><div class="deco"></div></div>`;
+// sticker mèo dán lệch khắp nền như sổ dán sticker; mỗi lần mở app đổi bộ khác
+const DECO_SLOTS=[[-4,7,-12],[82,3,10],[-7,30,8],[85,24,-9],[-5,53,-5],[84,47,12],[-6,76,10],[82,72,-7],[36,90,-4],[22,-2,6],[60,-3,-8],[48,38,5],[16,62,-10],[66,84,7]];
+const DECO_SIDE=[[-9,13,-12],[79,17,10],[-10,37,8],[81,41,-9],[-9,61,-5],[80,65,12],[-10,85,10],[79,89,-7]];
+function decoFill(){const d=document.querySelector('.sky .deco');if(!d)return;const dm=S.deco||'many';if(dm==='off'){d.innerHTML='';return}let SL=innerWidth<700?DECO_SIDE:DECO_SLOTS;if(dm==='few')SL=SL.filter((_,k)=>k%2===0);const cats=[...STKALL].sort(()=>Math.random()-.5),fish=[...STK.fish].sort(()=>Math.random()-.5);let ci=0,fi=0;
+  d.innerHTML=SL.map(([x,y,r],k)=>{const isF=k%4===3;const n=isF?fish[fi++%fish.length]:cats[ci++%cats.length];
+    return `<img class="dk${isF?' fish':''}${x>12&&x<76?' mid':''}" src="${stkSrc(n)}" alt="" draggable="false" loading="lazy" style="left:${x}%;top:${y}%;--r:${r}deg;--d:${(k*0.37%2.4).toFixed(2)}s">`}).join('')}
+function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);decoFill();SKYFX.start()}}
 const SKYFX=(()=>{
   // màu trời theo giờ (ban ngày): bình minh hồng, trưa xanh, chiều vàng cam
   const K=[[5,'#f0a9b4','#fcd9c8'],[7,'#7fbcf0','#d4ebfb'],[11,'#5aa8ec','#cfe8fb'],[15,'#72b4ee','#d9ecfa'],[17,'#f2b07a','#fbdcc0'],[18.5,'#d98aa8','#f6cfc8'],[24,'#d98aa8','#f6cfc8']];
@@ -220,9 +239,9 @@ function sys(){
     <div class="ot">${L('Giao diện','Appearance')}</div>
     <div class="seg" id="smode">${[['auto',L('Theo giờ','By time')],['day',L('Ban ngày','Day')],['night',L('Ban đêm','Night')]].map(([k,l])=>`<button data-m="${k}" class="${S.mode===k?'on':''}">${l}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:6px">${L('Theo giờ: ban đêm từ 18:00 đến 6:00.','By time: starry night from 18:00 to 6:00.')}</div></div>
-   <div class="card"><div class="ot">${L('Bầu trời','Sky')}</div>
-    <div class="seg">${[[1,L('Mây nghiêng theo máy','Tilt with phone')],[0,L('Mây đứng yên','Still')]].map(([k,l])=>`<button data-tl="${k}" class="${(S.tilt===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
-    <div class="tiny" style="margin-top:6px">${L('Màu trời ban ngày đổi theo giờ: sáng hồng, trưa xanh, chiều cam. Ban đêm là dải ngân hà.','Daytime sky changes with the hour. Night shows the Milky Way.')}${SKYFX.needsAsk()?L(' iPhone sẽ hỏi quyền dùng cảm biến chuyển động một lần.',' iPhone asks for motion access once.'):''}</div></div>
+   <div class="card"><div class="ot">${L('Sticker nền','Background stickers')}</div>
+    <div class="seg">${[['many',L('Dán dày','Lots')],['few',L('Dán ít','A few')],['off',L('Tắt','Off')]].map(([k,l])=>`<button data-dk="${k}" class="${(S.deco||'many')===k?'on':''}">${l}</button>`).join('')}</div>
+    <div class="tiny" style="margin-top:6px">${L('Sticker mèo Mụt Ruồi do Na vẽ, mỗi lần mở app đổi bộ khác.','Ruồi the cat stickers drawn by Na; a new mix every time you open the app.')}</div></div>
    <div class="card"><div class="ot">${L('Nhạc nền','Background music')}</div>
     <div class="row"><div class="seg grow">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-mu="${k}" class="${(MUSIC.on?1:0)===k?'on':''}">${l}</button>`).join('')}</div></div>
     <div class="row" style="margin-top:12px"><span class="tiny">${L('Âm lượng','Volume')}</span><input type="range" id="smv" class="grow" min="0" max="100" value="${Math.round((S.vol??0.5)*100)}" style="accent-color:var(--bee-deep)"></div>
@@ -230,7 +249,7 @@ function sys(){
    <div class="card"><div class="ot">${L('Hiệu ứng âm thanh','Sound effects')}</div>
     <div class="seg">${[[1,L('Bật','On')],[0,L('Tắt','Off')]].map(([k,l])=>`<button data-sf="${k}" class="${(S.sfx===0?0:1)===k?'on':''}">${l}</button>`).join('')}</div>
     <div class="row" style="margin-top:12px"><span class="tiny">${L('Âm lượng','Volume')}</span><input type="range" id="sfv" class="grow" min="0" max="100" value="${Math.round((S.sfxv??0.6)*100)}" style="accent-color:var(--bee-deep)"></div>
-    <div class="row wrapbtn" style="margin-top:10px">${[['ok',L('Nhớ','Remembered')],['ng',L('Quên','Forgot')],['flip',L('Lật thẻ','Flip')],['woof',L('Chó ong','Shiratama')]].map(([k,l])=>`<button class="btn line sm" data-try="${k}">▶ ${l}</button>`).join('')}</div>
+    <div class="row wrapbtn" style="margin-top:10px">${[['ok',L('Nhớ','Remembered')],['ng',L('Quên','Forgot')],['flip',L('Lật thẻ','Flip')],['woof',L('Mèo Ruồi','Ruồi the cat')]].map(([k,l])=>`<button class="btn line sm" data-try="${k}">▶ ${l}</button>`).join('')}</div>
     <div class="tiny" style="margin-top:8px">${L('Nếu iPhone đang gạt im lặng thì sẽ không nghe tiếng.','No sound when the iPhone silent switch is on.')}</div></div>
    <div class="card"><div class="ot">${L('Kỳ thi','Exam')}</div>
     <div class="kv"><span>${esc(examName())}</span><b>${examDay()?examDay().toLocaleDateString(L('vi-VN','en-GB')):L('chưa đặt','not set')}</b></div>
@@ -257,6 +276,7 @@ function sys(){
     $('#sfv').oninput=e=>{S.sfxv=+e.target.value/100;save()};$('#sfv').onchange=()=>SFX.play('ok');
     $$('[data-try]').forEach(b=>b.onclick=()=>SFX.play(b.dataset.try));
     if($('#ssync'))$('#ssync').onclick=()=>SYNC.run();
+    $$('[data-dk]').forEach(b=>b.onclick=()=>{S.deco=b.dataset.dk;save();decoFill();draw()});
     $$('[data-tl]').forEach(b=>b.onclick=async()=>{if(b.dataset.tl==='1'){const ok=await SKYFX.askTilt();if(!ok)toast(L('iPhone chưa cho phép cảm biến chuyển động','Motion access was not allowed'))}else{S.tilt=0;save();document.documentElement.style.setProperty('--px',0);document.documentElement.style.setProperty('--py',0)}draw()});
     $('#smv').oninput=e=>{S.vol=+e.target.value/100;save();MUSIC.vol()};
     $$('[data-m]').forEach(b=>b.onclick=()=>{S.mode=b.dataset.m;save();applyLook();draw()});
@@ -873,7 +893,7 @@ async function ankiBox(){
   const a=$('#ankiAll');if(a)a.onclick=()=>startAnki(null,null);
   gianoMigrate(st);
   const gn=$('#gnopen');if(gn)gn.onclick=()=>gianoDialog(st,ankiBox);
-  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play(Math.random()<.5?'woof':'buzz');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
+  const hd=$('#hdog');if(hd){hd.onclick=()=>{dogDo(hd,'hop');sprAct(hd,'talk',1900);SFX.play('woof');const l=DOG_LINES();dogSay(hd,l[Math.floor(Math.random()*l.length)])};
     if(!S.greetDay||S.greetDay!==dayKey()){S.greetDay=dayKey();save();setTimeout(()=>dogSay(hd,nAll?L(`Hôm nay có ${nAll} thẻ đợi anh nè!`,`${nAll} cards are waiting today!`):L('Hôm nay xong hết rồi, giỏi ghê!','All done for today!'),4200),600)}}
   $$('[data-tw]').forEach(b=>b.onclick=()=>{S.collapsed=S.collapsed||{};S.collapsed[b.dataset.tw]=!S.collapsed[b.dataset.tw];save();ankiBox()});
   $$('[data-study]').forEach(b=>b.onclick=()=>startAnki(nodeSet(st,tree,b.dataset.study),b.dataset.study));
@@ -1251,7 +1271,7 @@ function schedule(card,g,P){
 const revType=s=>s===2?1:s===3?2:0;
 function renderAnki(){
   const it=AK.list[AK.i];
-  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('big','','done')}<div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};
+  if(!it){dropState();SFX.play('done');const D=daily();shell(`<div class="card center done" style="margin-top:40px">${dog('big done','','done')}<div class="hand praise">${pickOne(PRAISE())}</div><div style="font-size:22px;font-weight:800">${L('Xong rồi!','All done!')}</div><p class="muted">${L(`Xong ${AK.a+AK.g} lượt: ${AK.g} nhớ, ${AK.a} quên.`,`${AK.a+AK.g} reviews: ${AK.g} remembered, ${AK.a} forgot.`)}<br>${L(`Hôm nay: ${D.n} thẻ, ${Math.round(D.ms/60000)} phút.`,`Today: ${D.n} cards, ${Math.round(D.ms/60000)} min.`)}</p><button class="btn bee" id="akb">${L('Về','Back')}</button></div>`,{tabs:false});$('#akb').onclick=()=>{AK=null;TAB='home';render()};
     ankiState(true).then(st=>{const n=debtCards(st).length;const k=document.getElementById('akb');if(!n||!k)return;
       const b=document.createElement('button');b.className='btn line';b.style.cssText='display:block;margin:10px auto 0';b.textContent=L(`Còn nợ ${n} thẻ · trả tiếp`,`${n} cards behind · keep going`);b.onclick=()=>gianoDialog(st,()=>{AK=null;TAB='home';render()});k.after(b)}).catch(()=>{});return}
   const deck=AK.decks.find(d=>d.id===it.deck);const P=presetOf(deck);
@@ -1273,7 +1293,7 @@ function renderAnki(){
    <div class="deckwrap" id="akwrap"><div class="stage" id="stage">${dog('buddy'+(AK.dogAct&&Date.now()-AK.dogAct[1]<500?' '+AK.dogAct[0]:''),'akdog')}<div class="fc ${okColor(deckColor(it.deck,AK.decks))?'dcol':''}" id="fc" style="--dc:${okColor(deckColor(it.deck,AK.decks))||'transparent'}"><div class="face front"><div class="fin">${frontOnly(it.front)}</div></div><div class="face back"><div class="fin">${backHTML(it)}</div></div></div><svg class="aring" id="aring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/></svg></div>
      <div class="gradebar"><button class="gb ng" id="gq">← ${L('Quên','Forgot')}</button><div class="tiny" id="akhint">${L('Chạm thẻ để lật','Tap the card to flip')}<span class="desk"> · ${L('phím cách','space')}</span></div><button class="gb ok" id="gn">${L('Nhớ','Remembered')} →</button></div></div>`);
   ANKI.hydrate($('#fc'));
-  {const d=$('#akdog'),A=AK.dogAct;if(d&&A&&Date.now()-A[1]<500){const e=(Date.now()-A[1])/1000;d.querySelector('.sf').style.animationDelay=-e+'s';d._s=setTimeout(()=>{d.classList.remove('yay','sad');d.querySelector('.sf').style.animationDelay=''},(A[0]==='yay'?900:1300)-e*1000)}}
+
   const shown0=Date.now();clearInterval(AK.tmr);if(P.showTimer)AK.tmr=setInterval(()=>{const e=$('#aktm');if(!e)return clearInterval(AK.tmr);e.textContent=fmtTime(Math.min(P.capSec,(Date.now()-shown0)/1000))},1000);
   $('#akq').onclick=()=>{clearInterval(AK.tmr);clearTimeout(AK.at);AK=null;dropState();TAB='home';render()};
   $('#akundo').onclick=()=>{SFX.play('undo');undoAnki()};bindSizeBtn();
@@ -1561,7 +1581,7 @@ const SFX=(()=>{
     undo(t){tone(990,t,.12,'sine',.14,520)},
     buzz(t){const o=ctx.createOscillator(),l=ctx.createOscillator(),lg=ctx.createGain(),a=ctx.createGain();o.type='sawtooth';o.frequency.value=230;l.frequency.value=38;lg.gain.value=40;l.connect(lg);lg.connect(o.frequency);
       const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=900;a.gain.setValueAtTime(0,t);a.gain.linearRampToValueAtTime(.08*vol(),t+.05);a.gain.linearRampToValueAtTime(.0001,t+.5);o.connect(f);f.connect(a);a.connect(out);o.start(t);l.start(t);o.stop(t+.52);l.stop(t+.52)}, // chó ong vo ve
-    woof(t){tone(620,t,.12,'triangle',.22,420);tone(700,t+.16,.14,'triangle',.18,460)},  // "gâu gâu" nhỏ
+    woof(t){tone(520,t,.16,'triangle',.2,900);tone(900,t+.16,.26,'triangle',.18,480)},  // meo~  // "gâu gâu" nhỏ
     done(t){[523.25,659.25,783.99,1046.5].forEach((f,i)=>tone(f,t+i*.09,.6,'sine',.16))},
     open(t){tone(523.25,t,.25,'sine',.12);tone(783.99,t+.1,.4,'sine',.12)}};
   return {play(k){if(!on())return;try{init();if(ctx.state==='suspended')ctx.resume();P[k](ctx.currentTime+.01)}catch(e){}},set(v){S.sfx=v?1:0;save()},get on(){return on()}};

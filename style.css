@@ -1013,3 +1013,73 @@ body.padon .sess{bottom:calc(42px + env(safe-area-inset-bottom));transition:bott
 .dcs.on{box-shadow:0 0 0 3px var(--card-solid),0 0 0 5.5px var(--ink)}
 .dcol .gc{--gc:var(--dc)}
 .fc.dcol:not(.imgonly) .face{box-shadow:inset 0 7px 0 var(--dc),0 18px 40px -18px rgba(20,40,80,.35)}
+
+/* ===== v77: sổ dán sticker mèo Mụt Ruồi (tranh màu nước của Na) ===== */
+:root{
+  --sky1:#ffe3da;--sky2:#fff4ec;--day1:#ffe3da;--day2:#fff4ec;
+  --card:rgba(255,255,255,.93);--card-solid:#ffffff;--line:rgba(150,70,95,.13);--line2:rgba(150,70,95,.24);
+  --ink:#3b2a31;--ink2:#6d5560;--ink3:#a58a95;
+  --bee:#ff6f91;--bee-deep:#e44f75;--bee-ink:#ffffff;--bee-soft:#ffe4ec;
+  --orange:#ff9f45;--orange-soft:#fff0e0;
+  --ok:#2c9a6b;--ok-soft:#e0f5ea;--ng:#e5486b;--ng-soft:#ffe5eb;--lav:#b07fd6;--pink:#ffb3c6;
+  --shadow:0 2px 0 rgba(150,70,95,.05),0 12px 28px -14px rgba(170,70,95,.42);
+  --hand:"Patrick Hand","Nunito",cursive;
+  --dot:rgba(255,111,145,.2);
+}
+:root[data-mode="night"]{
+  --sky1:#2a2226;--sky2:#30272b;--card:rgba(58,46,52,.95);--card-solid:#3a2e34;--line:rgba(255,215,228,.12);--line2:rgba(255,215,228,.22);
+  --ink:#fbeef2;--ink2:#dcc2ca;--ink3:#a68b96;
+  --bee:#ff86a3;--bee-deep:#ff86a3;--bee-ink:#2b1219;--bee-soft:rgba(255,134,163,.15);
+  --orange:#ffb066;--orange-soft:rgba(255,176,102,.14);
+  --ok:#7fd6a6;--ok-soft:rgba(127,214,166,.14);--ng:#ff8fa8;--ng-soft:rgba(255,143,168,.14);
+  --shadow:0 2px 0 rgba(0,0,0,.25),0 14px 32px -14px rgba(0,0,0,.75);
+  --dot:rgba(255,200,215,.07);
+}
+.sky-grad,.sky .paint,.sky .tint,.sky .meadow,.sky .bfly,.sky .night,.sky .sun,.sky .sky-l,.sky svg,.sky .spark{display:none!important}
+.sky{background:var(--sky2)}
+.sky .paper{position:absolute;inset:0;background:radial-gradient(var(--dot) 1.5px,transparent 1.8px) 0 0/22px 22px,linear-gradient(180deg,var(--sky1),var(--sky2) 80%)}
+.sky .deco{position:absolute;inset:0;pointer-events:none}
+.sky .deco .dk{position:absolute;width:clamp(96px,23vw,210px);height:auto;transform:rotate(var(--r));filter:drop-shadow(0 5px 7px rgba(140,55,80,.22));animation:dkwob 7s ease-in-out var(--d) infinite;-webkit-user-drag:none}
+.sky .deco .dk.fish{width:clamp(72px,15vw,140px)}
+:root[data-mode="night"] .sky .deco .dk{filter:drop-shadow(0 5px 8px rgba(0,0,0,.5)) brightness(.92)}
+@keyframes dkwob{0%,100%{transform:rotate(var(--r)) translateY(0)}50%{transform:rotate(calc(var(--r) + 3deg)) translateY(-5px)}}
+@media (min-width:900px){.sky .deco .dk{width:clamp(130px,13vw,230px)}}
+/* thẻ và nút */
+:root:not([data-mode="night"]) .card,:root:not([data-mode="night"]) .tool{background:var(--card)}
+:root[data-mode="night"] .card,:root[data-mode="night"] .tool,:root[data-mode="night"] .tabs{background:var(--card)}
+.btn.bee,:root[data-mode="night"] .btn.bee{background:linear-gradient(180deg,#ff8aa6,var(--bee));color:var(--bee-ink);box-shadow:0 3px 0 var(--bee-deep)}
+:root[data-mode="night"] .btn.bee{background:linear-gradient(180deg,#ffa0b7,var(--bee))}
+.tabs button.on{background:var(--bee);color:var(--bee-ink)}
+.hero{background:linear-gradient(135deg,var(--card) 45%,var(--bee-soft))}
+.hero-n{background:linear-gradient(90deg,var(--ink),var(--bee) 130%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero::before,.card.done::before{content:"";position:absolute;left:18px;top:-9px;width:86px;height:22px;transform:rotate(-6deg);background:repeating-linear-gradient(45deg,rgba(255,111,145,.55) 0 7px,rgba(255,159,69,.5) 7px 14px);border-radius:3px;opacity:.85;box-shadow:0 1px 2px rgba(0,0,0,.08);pointer-events:none;z-index:3}
+.card.done{position:relative;overflow:visible}
+/* chữ viết tay cho tiêu đề */
+.brand,.intro-name,.hero-n,.praise,.hand,.ttl,.h,.sthead,.flh-k{font-family:var(--hand)}
+.brand{font-size:27px;font-weight:400;letter-spacing:.02em}
+.hero-n{font-weight:400;font-size:66px;letter-spacing:0}
+.hero-n span{font-family:var(--hand);font-weight:400;font-size:22px}
+.praise{font-size:28px;line-height:1.2;color:var(--bee-deep);transform:rotate(-2deg);margin:2px 0 8px}
+:root[data-mode="night"] .praise{color:var(--bee)}
+/* linh vật: sticker mèo */
+.dog.stk{width:calc(var(--dw,120px)*1.3);aspect-ratio:1;animation:bob 3.4s ease-in-out infinite}
+.dog.stk img{object-fit:contain;filter:drop-shadow(0 4px 5px rgba(140,55,80,.28))}
+:root[data-mode="night"] .dog.stk img{filter:drop-shadow(0 4px 6px rgba(0,0,0,.55))}
+.dog.stk.pop{animation:stkpop .55s cubic-bezier(.3,1.7,.5,1)}
+@keyframes stkpop{0%{transform:scale(.7) rotate(-8deg)}60%{transform:scale(1.08) rotate(3deg)}100%{transform:none}}
+.dog.stk.mini{--dw:36px}
+.dog.big.done{--dw:190px;margin:-70px auto 0}
+.card.done{margin-top:90px!important}
+.stage>.dog.stk{--dw:72px;top:auto;bottom:-14px;right:-12px;left:auto;z-index:6}
+.stage>.dog.stk .bubble{right:calc(100% - 8px);left:auto;top:-10px;border-radius:16px 16px 4px 16px;transform-origin:bottom right}
+@media (min-width:700px){.stage>.dog.stk{--dw:96px;right:-40px;bottom:-20px}}
+@media (prefers-reduced-motion:reduce){.sky .deco .dk,.dog.stk{animation:none!important}}
+/* màn mở app */
+#intro,:root[data-mode="night"] #intro{background:radial-gradient(var(--dot) 1.5px,transparent 1.8px) 0 0/22px 22px,linear-gradient(180deg,var(--sky1),var(--sky2) 80%)}
+#intro .intro-sky{display:none}
+.intro-dog.spr .sf,:root[data-mode="night"] .intro-dog.spr .sf{background:url(img/st/mat.webp) center/contain no-repeat!important;animation:none!important;filter:drop-shadow(0 6px 8px rgba(140,55,80,.3))}
+.intro-name,:root[data-mode="night"] .intro-name{font-weight:400;font-size:44px;color:var(--bee-deep);text-shadow:none}
+:root[data-mode="night"] .intro-name{color:var(--bee)}
+:root[data-mode="night"] .sky .deco .dk{opacity:.8}
+.sky .deco .dk.mid{opacity:.55}
+body.studying .sky .deco .dk.mid{display:none}

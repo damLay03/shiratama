@@ -184,10 +184,40 @@ ${SPARK.map(([x,y,k],i)=>`<img class="spark" src="img/star.webp" alt="" style="l
 // sticker mèo dán lệch khắp nền như sổ dán sticker; mỗi lần mở app đổi bộ khác
 const DECO_SLOTS=[[90,93,-12],[82,3,10],[-7,30,8],[85,24,-9],[-5,53,-5],[84,47,12],[-6,76,10],[82,72,-7],[36,90,-4],[22,-2,6],[60,-3,-8],[48,38,5],[16,62,-10],[66,84,7]];
 const DECO_SIDE=[[-9,13,-12],[79,17,10],[-10,37,8],[81,41,-9],[-9,61,-5],[80,65,12],[-10,85,10],[79,89,-7]];
-function decoFill(){const d=document.querySelector('.sky .deco');if(!d)return;const dm=S.deco||'many';if(dm==='off'){d.innerHTML='';return}let SL=innerWidth<1000?DECO_SIDE:DECO_SLOTS;if(dm==='few')SL=SL.filter((_,k)=>k%2===0);const cats=[...STKALL].sort(()=>Math.random()-.5),fish=[...STK.fish].sort(()=>Math.random()-.5);let ci=0,fi=0;
-  d.innerHTML=SL.map(([x,y,r],k)=>{const isF=k%4===3;const n=isF?fish[fi++%fish.length]:cats[ci++%cats.length];
-    return `<img class="dk${isF?' fish':''}${x>12&&x<76?' mid':''}" src="${stkSrc(n)}" alt="" draggable="false" loading="lazy" style="left:${x}%;top:${y}%;--r:${r}deg;--d:${(k*0.37%2.4).toFixed(2)}s">`}).join('')}
-function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);decoFill();SKYFX.start()}}
+function decoFill(){const d=document.querySelector('.sky .deco');if(!d)return;const dm=S.deco||'many';if(dm==='off'){d.innerHTML='';return}
+  // bản 81: không đặt sẵn chỗ; DECOFREE tìm chỗ trống thật trên màn (không đè nội dung, không lọt ra mép) rồi mới hiện sticker
+  const N=dm==='few'?6:16;const cats=[...STKALL].sort(()=>Math.random()-.5),fish=[...STK.fish].sort(()=>Math.random()-.5);let ci=0,fi=0;
+  d.innerHTML=[...Array(N).keys()].map(k=>{const isF=k%4===3;const n=isF?fish[fi++%fish.length]:cats[ci++%cats.length];const r=((k*37)%25)-12;
+    return `<img class="dk hid${isF?' fish':''}" src="${stkSrc(n)}" alt="" draggable="false" style="--r:${r}deg;--d:${(k*0.37%2.4).toFixed(2)}s">`}).join('');try{DECOFREE.refresh()}catch(e){}}
+function ensureSky(){if(!document.querySelector('.sky')){document.body.insertAdjacentHTML('afterbegin',SKY);decoFill();SKYFX.start();DECOFREE.start()}}
+// bản 81: sticker nền nào bị nội dung (thẻ, chữ, nút) che một phần thì ẩn đi, để không có sticker nào bị cắt mặt hay cắt nửa
+const DECOFREE=(()=>{let els=[],t=0,raf=0,on=false;
+  const MEDIA=/^(IMG|SVG|CANVAS|INPUT|SELECT|TEXTAREA|BUTTON|VIDEO|HR)$/i;
+  function collect(){els=[];const app=document.getElementById('app');if(!app)return;
+    const all=[...app.querySelectorAll('*'),...document.querySelectorAll('body>.veil *')];
+    for(const e of all){const c=getComputedStyle(e);if(c.display==='none'||c.visibility==='hidden'||c.opacity==='0')continue;
+      const bg=(c.backgroundColor!=='rgba(0, 0, 0, 0)'&&c.backgroundColor!=='transparent')||c.backgroundImage!=='none'||c.boxShadow!=='none';
+      if(bg||MEDIA.test(e.tagName)||[...e.childNodes].some(n=>n.nodeType===3&&n.textContent.trim()))els.push(e)}}
+  function rects(){const A=innerWidth*innerHeight,R=[];
+    for(const e of els){if(!e.isConnected)continue;const r=e.getBoundingClientRect();if(r.width<2||r.height<2||r.bottom<0||r.top>innerHeight||r.width*r.height>A*.85)continue;R.push({l:r.left-8,t:r.top-8,r:r.right+8,b:r.bottom+8,a:r.width*r.height})}
+    R.sort((x,y)=>y.a-x.a);const K=[];for(const r of R){if(!K.some(k=>k.l<=r.l&&k.t<=r.t&&k.r>=r.r&&k.b>=r.b))K.push(r)}return K}
+  const hit=(R,x,y,w,h)=>R.some(r=>r.l<x+w&&r.r>x&&r.t<y+h&&r.b>y);
+  // full=true: tìm chỗ mới cho sticker đang ẩn; full=false (đang cuộn): chỉ ẩn sticker bị nội dung đè
+  function check(full){raf=0;const ds=[...document.querySelectorAll('.sky .deco .dk')];if(!ds.length)return;const R=rects();const W=innerWidth,H=innerHeight,m=W<700?6:14;const placed=[];
+    ds.forEach(d=>{if(d.classList.contains('hid')||!d.dataset.x)return;const x=+d.dataset.x,y=+d.dataset.y,w=d.offsetWidth;
+      if(x+w>W-m+1||y+w>H-m+1||hit(R,x,y,w,w)||hit(placed,x,y,w,w)){d.classList.add('hid');return}placed.push({l:x+w*.08,t:y+w*.08,r:x+w*.92,b:y+w*.92})});
+    if(!full)return;
+    ds.forEach(d=>{if(!d.classList.contains('hid'))return;const w=d.offsetWidth;if(!w)return;const st=Math.max(16,w/4),C=[];
+      for(let y=m;y+w<=H-m;y+=st)for(let x=m;x+w<=W-m;x+=st)C.push([x,y]);
+      for(let k=C.length-1;k>0;k--){const q=Math.floor(Math.random()*(k+1));[C[k],C[q]]=[C[q],C[k]]}
+      const c=C.find(([x,y])=>!hit(R,x,y,w,w)&&!hit(placed,x,y,w,w));if(!c)return;
+      d.dataset.x=c[0];d.dataset.y=c[1];d.style.setProperty('--x',c[0]+'px');d.style.setProperty('--y',c[1]+'px');d.classList.remove('hid');placed.push({l:c[0]+w*.08,t:c[1]+w*.08,r:c[0]+w*.92,b:c[1]+w*.92})})}
+  let st2=0;const sched=()=>{if(!on)return;if(!raf)raf=requestAnimationFrame(()=>check(false));clearTimeout(st2);st2=setTimeout(()=>check(true),300)};
+  function refresh(){clearTimeout(t);t=setTimeout(()=>{collect();check(true)},150)}
+  function start(){if(on)return;on=true;
+    new MutationObserver(ms=>{if(ms.some(m=>!(m.target.closest&&m.target.closest('.sky'))))refresh()}).observe(document.body,{childList:true,subtree:true,characterData:true});
+    addEventListener('scroll',sched,{capture:true,passive:true});addEventListener('resize',()=>{decoFill();refresh()});refresh()}
+  return {start,refresh}})();
 const SKYFX=(()=>{
   // màu trời theo giờ (ban ngày): bình minh hồng, trưa xanh, chiều vàng cam
   const K=[[5,'#f0a9b4','#fcd9c8'],[7,'#7fbcf0','#d4ebfb'],[11,'#5aa8ec','#cfe8fb'],[15,'#72b4ee','#d9ecfa'],[17,'#f2b07a','#fbdcc0'],[18.5,'#d98aa8','#f6cfc8'],[24,'#d98aa8','#f6cfc8']];

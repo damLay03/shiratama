@@ -1158,3 +1158,12 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;bor
 /* máy tính bảng dọc: cột nội dung rộng hơn, thẻ gợi ý đề xếp dọc cho thoáng */
 @media (min-width:700px) and (max-width:899px){.wrap{max-width:660px}.exhero{grid-template-columns:1fr}}
 @media (max-width:699px){.flhero{padding-right:74px}.flhero .dog{--dw:50px!important}}
+/* v81: sticker nền luôn nằm trọn trong màn hình (Na không thích sticker bị mép cắt mặt, cắt nửa) */
+.sky .deco .dk{--w:clamp(96px,23vw,210px);--m:16px;width:var(--w);height:var(--w);object-fit:contain;left:clamp(var(--m),var(--x),calc(100% - var(--w) - var(--m)));top:clamp(var(--m),var(--y),calc(100% - var(--w) - var(--m)))}
+.sky .deco .dk.fish{--w:clamp(72px,15vw,140px);width:var(--w);height:var(--w)}
+@media (min-width:900px){.sky .deco .dk{--w:clamp(130px,13vw,230px)}.sky .deco .dk.fish{--w:clamp(90px,9vw,150px)}}
+@media (max-width:699px){.sky .deco .dk{--w:88px;--m:6px}.sky .deco .dk.fish{--w:70px}}
+.sky .deco .dk{transition:opacity .35s,visibility .35s}
+.sky .deco .dk.hid{opacity:0!important;visibility:hidden}
+@media (min-width:700px) and (max-width:899px){.wrap{max-width:600px}}
+@media (min-width:700px) and (max-width:999px){.sky .deco .dk{--w:84px}.sky .deco .dk.fish{--w:70px}}
